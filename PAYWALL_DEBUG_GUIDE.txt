@@ -1,0 +1,89 @@
+PAYWALL DEBUG GUIDE
+===================
+
+I've added comprehensive logging to help debug the paywall flow. 
+Here's what to look for in your console logs:
+
+EXPECTED LOG FLOW (when everything works):
+------------------------------------------
+
+1. When PersonalPlanScreen renders:
+   [QuestionnaireNavigator] Rendering PersonalPlanScreen
+
+2. When user clicks Continue button (after 100% complete):
+   [PersonalPlanScreen] 🔘 Continue button pressed
+   [PersonalPlanScreen] isComplete: true isPresenting: false
+   [PersonalPlanScreen] paywallState: idle (or other state)
+   [PersonalPlanScreen] paywallPlacement: onboarding_paywall
+   [PersonalPlanScreen] 🚀 Calling showPaywall...
+
+3. Inside usePaywall hook:
+   [usePaywall] 🎯 showPaywall called with placement: campaign_trigger
+   [usePaywall] 📞 Calling registerPlacement...
+
+4. Then ONE of these outcomes:
+
+   A) PAYWALL SHOWS (Success):
+      [usePaywall] ✅ Paywall PRESENTED: <paywall_name>
+      [PersonalPlanScreen] 🎬 Paywall presented callback
+      ... user interacts with paywall ...
+      [usePaywall] 🚪 Paywall DISMISSED with result: purchased/restored/declined
+      [PersonalPlanScreen] 🏁 Paywall dismissed callback. Result: <type>
+
+   B) PAYWALL SKIPPED (User already subscribed or holdout):
+      [usePaywall] ⏭️ Paywall SKIPPED. Reason: <reason>
+      [usePaywall] 🎁 Feature callback executed - user allowed through without paywall
+      [PersonalPlanScreen] ⏩ Paywall skipped - user already subscribed or in holdout
+
+   C) ERROR:
+      [usePaywall] ❌ Paywall ERROR: <error message>
+      [usePaywall] ❌ registerPlacement failed: <error>
+
+
+COMMON ISSUES TO CHECK:
+-----------------------
+
+1. If you DON'T see "[PersonalPlanScreen] 🔘 Continue button pressed":
+   → The button isn't being clicked or handleContinuePress isn't wired up
+
+2. If you see "isComplete: false":
+   → The progress animation hasn't finished yet (wait for 100%)
+
+3. If you see "[usePaywall] ⏭️ Paywall SKIPPED":
+   → Check the skip reason. Common reasons:
+      - "UserIsSubscribed": User already has an active subscription
+      - "Holdout": User is in a holdout experiment group
+      - "NoRuleMatch": The placement doesn't match any campaign rules
+
+4. If you see "[usePaywall] ❌ Paywall ERROR":
+   → Check the error message. Common issues:
+      - Placement "onboarding_paywall" not configured in Superwall dashboard
+      - No campaign attached to this placement
+      - Network issues preventing config download
+
+5. If logs stop after "[usePaywall] 📞 Calling registerPlacement...":
+   → The registerPlacement call might be hanging or failing silently
+   → Check Superwall configuration and network connectivity
+
+
+WHAT TO DO NEXT:
+----------------
+
+1. Run your app and complete the questionnaire
+2. Copy ALL the console logs after clicking Continue
+3. Share them so we can identify exactly where the flow breaks
+4. Check your Superwall dashboard:
+   - Go to Campaigns
+   - Verify "campaign_trigger" placement exists (this is the default)
+   - Verify it's attached to a campaign with a paywall
+   - Check campaign rules and audience matching
+
+SUPERWALL DASHBOARD CHECKLIST:
+------------------------------
+□ Placement "campaign_trigger" exists (DEFAULT placement - should be there already!)
+□ Campaign is created and active
+□ Campaign includes "campaign_trigger" placement
+□ Paywall is attached to the campaign
+□ Campaign rules allow the user to see the paywall
+□ Products are configured in Superwall
+□ App is using correct API key (check App.tsx)

@@ -4,13 +4,29 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SuperwallProvider, useSuperwall } from 'expo-superwall';
 import { LoginScreen } from './src/screens/LoginScreen';
 
-// Component to handle deep links for Superwall
+// Component to handle deep links and subscription status initialization
 // Note: The SDK may handle some deep links automatically, but we set this up
 // to ensure all deep links are properly routed to Superwall
 function DeepLinkHandler() {
   const superwall = useSuperwall();
 
   useEffect(() => {
+    // Initialize subscription status to INACTIVE for new users
+    // This prevents the "unknown" status timeout error (SWKPresentationError: 105)
+    // The status should be updated to ACTIVE when the user makes a purchase
+    const initializeSubscriptionStatus = async () => {
+      try {
+        await superwall.setSubscriptionStatus({
+          status: 'INACTIVE',
+        });
+        console.log('Subscription status initialized to INACTIVE');
+      } catch (error) {
+        console.error('Failed to initialize subscription status:', error);
+      }
+    };
+
+    initializeSubscriptionStatus();
+
     // Handle deep links when app is opened from a closed state
     const handleInitialUrl = async () => {
       const url = await Linking.getInitialURL();
@@ -56,7 +72,15 @@ function DeepLinkHandler() {
 
 export default function App() {
   return (
-    <SuperwallProvider apiKeys={{ ios: "pk_-w27jLL0CBIyfAFdcSG3Z", android: "pk_-w27jLL0CBIyfAFdcSG3Z" }}>
+    <SuperwallProvider 
+      apiKeys={{ ios: "pk_1XJ62ooPiSXsAdIGSOkT_", android: "pk_1XJ62ooPiSXsAdIGSOkT_" }}
+      options={{
+        logging: {
+          level: 'debug', // Enable debug logging to see configuration issues
+          scopes: ['all'], // Log all Superwall events
+        },
+      }}
+    >
       <SafeAreaProvider>
         <DeepLinkHandler />
         <LoginScreen />

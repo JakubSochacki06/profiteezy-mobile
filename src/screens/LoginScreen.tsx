@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { usePlacement } from 'expo-superwall';
 import { colors } from '../theme/colors';
+import { QuestionnaireNavigator, questionnaireData, QuestionnaireResult } from '../questionnaire';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,42 +36,17 @@ export const LoginScreen = () => {
   const insets = useSafeAreaInsets();
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const bubbleIdRef = useRef(0);
+  const [showQuestionnaire, setShowQuestionnaire] = useState(false);
 
-  // Set up the onboarding questionnaire placement
-  const { registerPlacement } = usePlacement({
-    onPresent: (info) => {
-      console.log('Onboarding questionnaire presented:', info.name);
-    },
-    onDismiss: (info, result) => {
-      console.log('Onboarding questionnaire dismissed:', result.type);
-      // After the questionnaire is completed, you can navigate to the main app
-      // Result types: 'purchased', 'declined', 'restored'
-      if (result.type === 'purchased' || result.type === 'declined' || result.type === 'restored') {
-        // TODO: Navigate to main app or continue onboarding
-        console.log('User completed questionnaire, ready to proceed');
-      }
-    },
-    onSkip: (reason) => {
-      console.log('Onboarding questionnaire skipped:', reason.type);
-      // If skipped, proceed to main app anyway
-      // TODO: Navigate to main app
-    },
-    onError: (error) => {
-      console.error('Onboarding questionnaire error:', error);
-      // On error, you might want to proceed anyway or show an error message
-    },
-  });
+  const handleGetStarted = () => {
+    setShowQuestionnaire(true);
+  };
 
-  const handleGetStarted = async () => {
-    // Present the onboarding questionnaire paywall
-    await registerPlacement({
-      placement: 'onboarding_questionnaire',
-      feature: () => {
-        // This function runs if no paywall is shown (e.g., user already completed it)
-        // TODO: Navigate to main app or next onboarding step
-        console.log('Proceeding without questionnaire');
-      },
-    });
+  const handleQuestionnaireComplete = (results: QuestionnaireResult) => {
+    console.log('Questionnaire completed with results:', results);
+    // TODO: Save results and navigate to main app
+    // You can store these results in your backend or local storage
+    // Then navigate to the main app screen
   };
 
   const handleSignIn = () => {
@@ -154,6 +129,16 @@ export const LoginScreen = () => {
 
   if (!fontsLoaded) {
     return null; // Or a loading screen
+  }
+
+  // Show questionnaire if user clicked Get Started
+  if (showQuestionnaire) {
+    return (
+      <QuestionnaireNavigator
+        data={questionnaireData}
+        onComplete={handleQuestionnaireComplete}
+      />
+    );
   }
 
   const getBubblePosition = (bubble: Bubble) => {
