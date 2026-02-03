@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
 import { SuperwallProvider, useSuperwall } from 'expo-superwall';
 import { LoginScreen } from './src/screens/LoginScreen';
 
@@ -82,8 +83,10 @@ export default function App() {
       }}
     >
       <SafeAreaProvider>
-        <DeepLinkHandler />
-        <LoginScreen />
+        <NavigationContainer>
+          <DeepLinkHandler />
+          <LoginScreen />
+        </NavigationContainer>
       </SafeAreaProvider>
     </SuperwallProvider>
   );

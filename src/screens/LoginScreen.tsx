@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { colors } from '../theme/colors';
 import { QuestionnaireNavigator, questionnaireData, QuestionnaireResult } from '../questionnaire';
+import { usePaywall } from '../hooks/usePaywall';
+import { MainTabNavigator } from '../navigation';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,6 +39,21 @@ export const LoginScreen = () => {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const bubbleIdRef = useRef(0);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
+  const [showHome, setShowHome] = useState(false);
+
+  const { showPaywall } = usePaywall({
+    placement: 'onboarding_complete',
+    onDismiss: (result) => {
+      if (result.type === 'purchased' || result.type === 'restored') {
+        setShowHome(true);
+        setShowQuestionnaire(false);
+      }
+    },
+    onSkip: () => {
+      setShowHome(true);
+      setShowQuestionnaire(false);
+    },
+  });
 
   const handleGetStarted = () => {
     setShowQuestionnaire(true);
@@ -44,9 +61,7 @@ export const LoginScreen = () => {
 
   const handleQuestionnaireComplete = (results: QuestionnaireResult) => {
     console.log('Questionnaire completed with results:', results);
-    // TODO: Save results and navigate to main app
-    // You can store these results in your backend or local storage
-    // Then navigate to the main app screen
+    showPaywall();
   };
 
   const handleSignIn = () => {
@@ -131,6 +146,11 @@ export const LoginScreen = () => {
     return null; // Or a loading screen
   }
 
+  // Show Main Tab Navigator if user has completed onboarding and paywall
+  if (showHome) {
+    return <MainTabNavigator />;
+  }
+
   // Show questionnaire if user clicked Get Started
   if (showQuestionnaire) {
     return (
@@ -159,6 +179,14 @@ export const LoginScreen = () => {
           <View style={styles.logoPlaceholder}>
             <Text style={styles.logoText}>Profiteezy</Text>
           </View>
+          {/* Sneaky Debug Button - Remove in production */}
+          <TouchableOpacity 
+            onPress={() => setShowHome(true)}
+            style={styles.debugButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.debugButtonText}>🏠</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Concentric Circles with Dollar Sign */}
@@ -372,5 +400,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'Inter_500Medium',
     marginTop: 8,
+  },
+  debugButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  debugButtonText: {
+    fontSize: 24,
   },
 });

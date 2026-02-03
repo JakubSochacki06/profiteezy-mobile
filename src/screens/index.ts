@@ -1,3 +1,5 @@
 export { HomeScreen } from './HomeScreen';
 export { LoginScreen } from './LoginScreen';
-export { MoneyMakingProbabilityScreen } from './MoneyMakingProbabilityScreen';
+export { LearnScreen } from './LearnScreen';
+export { ProfileScreen } from './ProfileScreen';
+export { CoursePathScreen } from './CoursePathScreen';

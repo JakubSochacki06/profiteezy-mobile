@@ -37,33 +37,19 @@ export const PersonalPlanScreen: React.FC<Props> = ({
   // Debug: Track renders vs remounts
   renderCountRef.current += 1;
   const wasAnimationStarted = animationStartedRef.current;
-  
-  if (renderCountRef.current === 1) {
-    console.log('[PersonalPlanScreen] 🆕 Component MOUNTED (new instance, mount ID:', mountIdRef.current + ')');
-  } else if (!wasAnimationStarted) {
-    console.log('[PersonalPlanScreen] ⚠️ Component REMOUNTED (animation ref reset, mount ID:', mountIdRef.current + ')');
-  } else {
-    console.log('[PersonalPlanScreen] 🔄 Component RERENDERED (render #' + renderCountRef.current + ', mount ID:', mountIdRef.current + ')');
-  }
-  console.log('[PersonalPlanScreen] Current state - isComplete:', isComplete, 'percent:', percent, 'currentReviewIndex:', currentReviewIndex);
 
   // Paywall hook - shows paywall when user completes the questionnaire
   const { showPaywall, isPresenting, state: paywallState } = usePaywall({
     placement: paywallPlacement,
     onPresent: () => {
-      console.log('[PersonalPlanScreen] 🎬 Paywall presented callback');
+      // Paywall presented
     },
     onDismiss: (result) => {
-      console.log('[PersonalPlanScreen] 🏁 Paywall dismissed callback. Result:', result.type);
       // Continue to main app after paywall interaction
       // User either purchased, restored, or declined
-      if (result.type === 'purchased' || result.type === 'restored') {
-        console.log('[PersonalPlanScreen] 💰 User subscribed successfully');
-      }
       onContinue();
     },
     onSkip: () => {
-      console.log('[PersonalPlanScreen] ⏩ Paywall skipped - user already subscribed or in holdout');
       // User is already subscribed or in holdout group
       onContinue();
     },
@@ -71,24 +57,15 @@ export const PersonalPlanScreen: React.FC<Props> = ({
 
   // Handle continue button press - show paywall
   const handleContinuePress = async () => {
-    console.log('[PersonalPlanScreen] 🔘 Continue button pressed');
-    console.log('[PersonalPlanScreen] isComplete:', isComplete, 'isPresenting:', isPresenting);
-    console.log('[PersonalPlanScreen] paywallState:', paywallState);
-    console.log('[PersonalPlanScreen] paywallPlacement:', paywallPlacement);
-    
     if (!isComplete) {
-      console.log('[PersonalPlanScreen] ⚠️ Cannot continue - plan not complete yet');
       return;
     }
     
     if (isPresenting) {
-      console.log('[PersonalPlanScreen] ⚠️ Cannot continue - paywall already presenting');
       return;
     }
     
-    console.log('[PersonalPlanScreen] 🚀 Calling showPaywall...');
     await showPaywall();
-    console.log('[PersonalPlanScreen] ✅ showPaywall returned');
   };
 
   // Animation duration in ms
@@ -98,11 +75,9 @@ export const PersonalPlanScreen: React.FC<Props> = ({
   useEffect(() => {
     // Prevent animation from running multiple times
     if (animationStartedRef.current) {
-      console.log('[PersonalPlanScreen] ⚠️ Animation useEffect called but already started - preventing restart');
       return;
     }
     
-    console.log('[PersonalPlanScreen] 🎬 Starting progress animation');
     animationStartedRef.current = true;
     
     // Generate realistic variable step sizes that add up to 100
@@ -170,7 +145,6 @@ export const PersonalPlanScreen: React.FC<Props> = ({
 
         // Complete when reached 100%
         if (currentValue >= 100 || stepIndex >= normalizedSteps.length) {
-          console.log('[PersonalPlanScreen] ✅ Animation completed - reached 100%');
           animateToValue(100);
           setPercent(100);
           setIsComplete(true);
@@ -188,11 +162,8 @@ export const PersonalPlanScreen: React.FC<Props> = ({
   // Review rotation logic
   useEffect(() => {
     if (!data.reviews || data.reviews.length <= 1) return;
-
-    console.log('[PersonalPlanScreen] 🔄 Starting review rotation (every 6 seconds)');
     
     const interval = setInterval(() => {
-      console.log('[PersonalPlanScreen] 🔄 Rotating review (this is expected every 6 seconds)');
       // Fade out
       Animated.timing(fadeAnim, {
         toValue: 0,

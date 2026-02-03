@@ -3,114 +3,102 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   SafeAreaView,
-  TouchableOpacity,
-  Alert,
+  Image,
+  ScrollView,
+  StatusBar,
+  Platform,
 } from 'react-native';
-import { usePlacement } from 'expo-superwall';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { Button } from '../components';
 
 export const HomeScreen = () => {
-  const { registerPlacement, state } = usePlacement({
-    onPresent: (info) => {
-      console.log('Paywall presented:', info.name);
-    },
-    onDismiss: (info, result) => {
-      console.log('Paywall dismissed:', result.type);
-      if (result.type === 'purchased') {
-        Alert.alert('Success!', 'Thank you for your purchase!');
-      }
-    },
-    onSkip: (reason) => {
-      console.log('Paywall skipped:', reason.type);
-    },
-    onError: (error) => {
-      console.error('Paywall error:', error);
-      Alert.alert('Error', `Failed to present paywall: ${error}`);
-    },
-  });
+  const insets = useSafeAreaInsets();
 
-  const handleUnlockPremium = async () => {
-    await registerPlacement({
-      placement: 'campaign_trigger', // Default placement name from Superwall
-      feature: () => {
-        // This function only runs if no paywall is shown (user is allowed through)
-        Alert.alert('Feature Unlocked', 'You have access to premium features!');
-      },
-    });
-  };
+  // Get current day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const today = new Date().getDay();
+  
+  const days = [
+    { day: 'Mon', active: today === 1 },
+    { day: 'Tue', active: today === 2 },
+    { day: 'Wed', active: today === 3 },
+    { day: 'Thu', active: today === 4 },
+    { day: 'Fri', active: today === 5 },
+    { day: 'Sat', active: today === 6 },
+    { day: 'Sun', active: today === 0 },
+  ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Profiteezy</Text>
-          <Text style={styles.subtitle}>Your Profit Management Solution</Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome! 👋</Text>
-          <Text style={styles.cardText}>
-            Start tracking your business profits and make data-driven decisions.
-          </Text>
-        </View>
-
-        {/* Paywall Demo Button */}
-        <TouchableOpacity 
-          style={styles.premiumButton}
-          onPress={handleUnlockPremium}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.premiumButtonText}>✨ Unlock Premium Features</Text>
-        </TouchableOpacity>
-
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>$0</Text>
-            <Text style={styles.statLabel}>Total Profit</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statValue}>0</Text>
-            <Text style={styles.statLabel}>Transactions</Text>
-          </View>
-        </View>
-
-        <View style={styles.featuresContainer}>
-          <Text style={styles.sectionTitle}>Features</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+      <View style={[styles.contentContainer, { paddingTop: insets.top }]}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
           
-          <View style={styles.featureCard}>
-            <Text style={styles.featureIcon}>📊</Text>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Track Profits</Text>
-              <Text style={styles.featureDescription}>
-                Monitor your business profits in real-time
-              </Text>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <Text style={styles.logoText}>Profiteezy</Text>
+            </View>
+            <View style={styles.streakBadge}>
+              <Ionicons name="flash" size={16} color={colors.text.secondary} />
+              <Text style={styles.streakCount}>0</Text>
             </View>
           </View>
 
-          <View style={styles.featureCard}>
-            <Text style={styles.featureIcon}>📈</Text>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Analytics</Text>
-              <Text style={styles.featureDescription}>
-                Get detailed insights and reports
-              </Text>
+          {/* Streak Section */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.streakHeader}>
+              <Ionicons name="flash" size={20} color={colors.text.secondary} />
+              <Text style={styles.streakTitle}>Finish 1 lesson to begin your streak</Text>
+            </View>
+            <View style={styles.daysContainer}>
+              {days.map((item, index) => (
+                <View key={index} style={styles.dayItem}>
+                  <View style={styles.dayIconCircle}>
+                    <Ionicons name="flash" size={16} color={colors.text.tertiary} />
+                  </View>
+                  <Text style={[styles.dayText, item.active && styles.dayTextActive]}>
+                    {item.day}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
 
-          <View style={styles.featureCard}>
-            <Text style={styles.featureIcon}>💰</Text>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>Revenue Tracking</Text>
-              <Text style={styles.featureDescription}>
-                Track all your revenue streams
-              </Text>
+          {/* Pick up where you left off */}
+          <Text style={styles.sectionTitle}>Pick up where you left off</Text>
+          
+          <View style={styles.card}>
+            <View style={styles.cardImageContainer}>
+              <Image 
+                source={require('../../assets/questionnaire/questionnaireImage1.png')} 
+                style={styles.cardImage}
+                resizeMode="contain"
+              />
+            </View>
+            
+            <View style={styles.cardContent}>
+              <Text style={styles.cardSubtitle}>4 units • 4 hours</Text>
+              <Text style={styles.cardTitle}>First Steps to Profit with AI</Text>
+              
+              {/* Progress Bar */}
+              <View style={styles.progressContainer}>
+                <View style={[styles.progressBar, { width: '0%' }]} />
+              </View>
+              
+              <Button 
+                title="Start learning" 
+                onPress={() => console.log('Start learning pressed')}
+                fullWidth
+              />
             </View>
           </View>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+        </ScrollView>
+      </View>
+    </View>
   );
 };
 
@@ -119,116 +107,145 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  contentContainer: {
+    flex: 1,
+  },
   scrollContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
     marginTop: 20,
+    marginBottom: 30,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: 'bold',
+  logoContainer: {
+    backgroundColor: colors.surface, // Or transparent if preferred
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  logoText: {
     color: colors.text.primary,
-    marginBottom: 8,
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold', // Assuming fonts are loaded in App/Login
+    fontWeight: 'bold',
   },
-  subtitle: {
-    fontSize: 16,
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  streakCount: {
+    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  sectionContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 30,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  streakHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  streakTitle: {
     color: colors.text.secondary,
+    marginLeft: 8,
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
+  },
+  daysContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dayItem: {
+    alignItems: 'center',
+  },
+  dayIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dayText: {
+    color: colors.text.secondary,
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    fontWeight: '500',
+  },
+  dayTextActive: {
+    color: colors.accent,
+  },
+  sectionTitle: {
+    color: colors.text.primary,
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
+    marginBottom: 16,
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 20,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  cardImageContainer: {
+    height: 180,
+    backgroundColor: '#F5F5F5', // Light background for image to pop if needed
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardImage: {
+    width: '60%',
+    height: '80%',
+  },
+  cardContent: {
+    padding: 20,
+  },
+  cardSubtitle: {
+    color: colors.text.secondary,
+    fontSize: 14,
+    marginBottom: 8,
+    fontFamily: 'Inter_500Medium',
   },
   cardTitle: {
+    color: colors.text.primary,
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 8,
-  },
-  cardText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    lineHeight: 24,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 30,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 6,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: colors.accent,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
-  },
-  featuresContainer: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.primary,
     marginBottom: 16,
+    fontFamily: 'Inter_700Bold',
   },
-  featureCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  featureIcon: {
-    fontSize: 32,
-    marginRight: 16,
-  },
-  featureContent: {
-    flex: 1,
-  },
-  featureTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  featureDescription: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    lineHeight: 20,
-  },
-  premiumButton: {
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
+  progressContainer: {
+    height: 6,
+    backgroundColor: colors.background,
+    borderRadius: 3,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  premiumButtonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '600',
+  progressBar: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 3,
   },
 });

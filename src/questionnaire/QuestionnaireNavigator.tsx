@@ -4,7 +4,7 @@ import { WelcomeScreen } from './screens/WelcomeScreen';
 import { QuestionScreen } from './screens/QuestionScreen';
 import { ImageScreen } from './screens/ImageScreen';
 import { InputScreen } from './screens/InputScreen';
-import { MoneyMakingProbabilityResultScreen } from './screens/MoneyMakingProbabilityResultScreen';
+import { ReadinessScoreScreen } from './screens/ReadinessScoreScreen';
 import { PersonalPlanScreen } from './screens/PersonalPlanScreen';
 
 interface QuestionnaireNavigatorProps {
@@ -81,16 +81,11 @@ export const QuestionnaireNavigator: React.FC<QuestionnaireNavigatorProps> = ({
   };
 
   const handleImageContinue = () => {
-    console.log('[QuestionnaireNavigator] handleImageContinue called');
-    console.log('[QuestionnaireNavigator] currentIndex:', currentIndex, 'totalSteps:', totalSteps);
-    
     // Move to next question or complete
     if (currentIndex < totalSteps - 1) {
-      console.log('[QuestionnaireNavigator] Moving to next question');
       setCurrentIndex(currentIndex + 1);
     } else {
       // All questions answered
-      console.log('[QuestionnaireNavigator] ✅ All questions answered, calling onComplete');
       onComplete(answers);
     }
   };
@@ -139,7 +134,7 @@ export const QuestionnaireNavigator: React.FC<QuestionnaireNavigatorProps> = ({
   // Check if it's a result screen
   if (currentStep.type === 'result') {
     return (
-      <MoneyMakingProbabilityResultScreen
+      <ReadinessScoreScreen
         key={currentIndex}
         data={currentStep}
         onBack={handleQuestionBack}
@@ -152,7 +147,6 @@ export const QuestionnaireNavigator: React.FC<QuestionnaireNavigatorProps> = ({
 
   // Check if it's a personal plan screen
   if (currentStep.type === 'personal_plan') {
-    console.log('[QuestionnaireNavigator] Rendering PersonalPlanScreen');
     return (
       <PersonalPlanScreen
         key={currentIndex}

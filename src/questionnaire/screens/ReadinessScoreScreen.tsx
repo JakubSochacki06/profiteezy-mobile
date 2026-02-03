@@ -21,7 +21,7 @@ interface Props {
   totalSteps: number;
 }
 
-export const MoneyMakingProbabilityResultScreen: React.FC<Props> = ({
+export const ReadinessScoreScreen: React.FC<Props> = ({
   data,
   onContinue,
   onBack,
