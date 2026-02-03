@@ -17,6 +17,7 @@ import { colors } from '../theme/colors';
 import { useNavigation } from '@react-navigation/native';
 import { IconButton } from '../components';
 import { CoursePathScreen } from './CoursePathScreen';
+import { LessonScreen } from './LessonScreen';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 50) / 2; // 20 padding left, 20 padding right, 10 gap
@@ -101,17 +102,22 @@ export const CoursesScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Hide tab bar when a course is selected
+    // Hide tab bar when a course is selected or lesson is active
     const parent = navigation.getParent();
     if (parent) {
       parent.setOptions({
-        tabBarStyle: selectedCourse ? { display: 'none' } : undefined,
+        tabBarStyle: (selectedCourse || activeLessonId) ? { display: 'none' } : undefined,
       });
     }
 
     const onBackPress = () => {
+      if (activeLessonId) {
+        setActiveLessonId(null);
+        return true;
+      }
       if (selectedCourse) {
         setSelectedCourse(null);
         return true;
@@ -121,10 +127,29 @@ export const CoursesScreen = () => {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [selectedCourse, navigation]);
+  }, [selectedCourse, activeLessonId, navigation]);
+
+  if (activeLessonId) {
+    return (
+      <LessonScreen 
+        onClose={() => setActiveLessonId(null)}
+        onComplete={() => {
+          // TODO: Navigate to interactive tasks
+          console.log('Lesson completed');
+          setActiveLessonId(null);
+        }}
+      />
+    );
+  }
 
   if (selectedCourse) {
-    return <CoursePathScreen course={selectedCourse} onBack={() => setSelectedCourse(null)} />;
+    return (
+      <CoursePathScreen 
+        course={selectedCourse} 
+        onBack={() => setSelectedCourse(null)} 
+        onStartLesson={(lessonId) => setActiveLessonId(lessonId)}
+      />
+    );
   }
 
   const renderItem = ({ item }: { item: Course }) => (

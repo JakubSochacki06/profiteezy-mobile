@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,13 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const NODE_SIZE = 90;
 const PADDING = 40;
-const NODE_MARGIN_BOTTOM = 40; // Gap between rows
+const NODE_MARGIN_BOTTOM = 0; // Gap between rows
 const CONTAINER_WIDTH = width - (PADDING * 2);
-const CORNER_RADIUS = 50; // Radius for curved line corners (bigger, more visible curve)
-const LINE_WIDTH = 3; // Width of connecting lines
+const CORNER_RADIUS = 20; // Radius for curved line corners
+const LINE_WIDTH = 5; // Width of connecting lines
 
 interface Lesson {
   id: string;
@@ -116,20 +116,16 @@ const COURSE_DATA: Chapter[] = [
 interface CoursePathScreenProps {
   course: any;
   onBack: () => void;
+  onStartLesson?: (lessonId: string) => void;
 }
 
-export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBack }) => {
+export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBack, onStartLesson }) => {
   const insets = useSafeAreaInsets();
-  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
 
   const handleLessonPress = (lesson: Lesson) => {
-    if (!lesson.isLocked) {
-      setSelectedLesson(lesson);
-    }
-  };
-
-  const closeModal = () => {
-    setSelectedLesson(null);
+    // if (lesson.isLocked) return; // Allow clicking locked lessons
+    setSelectedLessonId(selectedLessonId === lesson.id ? null : lesson.id);
   };
 
   // Calculate completion rate
@@ -152,13 +148,16 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
               key={lesson.id} 
               style={[
                 styles.lessonRow,
-                { alignItems: isLeft ? 'flex-start' : 'flex-end' }
+                { 
+                  alignItems: isLeft ? 'flex-start' : 'flex-end',
+                  zIndex: selectedLessonId === lesson.id ? 100 : 1
+                }
               ]}
             >
               {/* Connector Lines with curved corners */}
               {!isLast && (
                 <>
-                  {/* Horizontal Line connecting to vertical line */}
+                  {/* Horizontal Line connecting from node to corner */}
                   <View style={[
                     styles.connectorHorizontal,
                     isLeft ? { 
@@ -174,13 +173,13 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
                     isLeft ? { 
                       right: 60 - LINE_WIDTH, // Position at the right side
                       borderRightWidth: LINE_WIDTH,
-                      borderBottomWidth: LINE_WIDTH,
-                      borderBottomRightRadius: CORNER_RADIUS,
+                      borderTopWidth: LINE_WIDTH,
+                      borderTopRightRadius: CORNER_RADIUS,
                     } : { 
                       left: 60 - LINE_WIDTH, // Position at the left side
                       borderLeftWidth: LINE_WIDTH,
-                      borderBottomWidth: LINE_WIDTH,
-                      borderBottomLeftRadius: CORNER_RADIUS,
+                      borderTopWidth: LINE_WIDTH,
+                      borderTopLeftRadius: CORNER_RADIUS,
                     },
                   ]} />
                   
@@ -206,7 +205,7 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
                   ]}
                   onPress={() => handleLessonPress(lesson)}
                   activeOpacity={0.8}
-                  disabled={lesson.isLocked}
+                  // disabled={lesson.isLocked} // Allow clicking locked lessons
                 >
                   <Ionicons 
                     name={lesson.type === 'video' ? 'play' : 'book'} 
@@ -226,6 +225,33 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
                   {lesson.title}
                 </Text>
               </View>
+
+              {/* Inline Popup */}
+              {selectedLessonId === lesson.id && (
+                <View style={[styles.inlinePopup, isLeft ? styles.popupLeft : styles.popupRight]}>
+                  <View style={[styles.popupArrow, isLeft ? styles.arrowLeft : styles.arrowRight]} />
+                  
+                  <Text style={styles.popupTitle}>{lesson.title}</Text>
+                  <Text style={styles.popupDescription}>{lesson.description}</Text>
+                  
+                  <View style={styles.popupButtons}>
+                    {lesson.isLocked ? (
+                      <TouchableOpacity style={[styles.listenButton, styles.lockedButton]} disabled>
+                        <Ionicons name="lock-closed-outline" size={20} color="#A1A1AA" />
+                        <Text style={[styles.listenButtonText, styles.lockedButtonText]}>Locked</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.listenButton}
+                        onPress={() => onStartLesson && onStartLesson(lesson.id)}
+                      >
+                        <Ionicons name="play-circle-outline" size={20} color={colors.background} />
+                        <Text style={styles.listenButtonText}>Start</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
             </View>
           );
         })}
@@ -250,20 +276,21 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
       </View>
 
       {/* Path Content */}
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {COURSE_DATA.map((chapter, chapterIndex) => (
+      <View style={{flex: 1}}>
+        <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+        >
+            {COURSE_DATA.map((chapter, chapterIndex) => (
           <View key={chapter.id} style={styles.chapterContainer}>
             {/* Chapter Header */}
             <View style={styles.chapterHeader}>
+              <Text style={styles.chapterTitle}>{chapter.title}</Text>
               <View style={styles.chapterBadge}>
                 <Text style={styles.chapterBadgeText}>
                   AI MASTERY • {course.title.toUpperCase()}: LEVEL {chapterIndex + 1}
                 </Text>
               </View>
-              <Text style={styles.chapterTitle}>{chapter.title}</Text>
             </View>
 
             {/* Lessons Path */}
@@ -271,49 +298,7 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
           </View>
         ))}
       </ScrollView>
-
-      {/* Lesson Details Modal */}
-      {selectedLesson && (
-        <Modal
-          transparent
-          visible={!!selectedLesson}
-          animationType="fade"
-          onRequestClose={closeModal}
-        >
-          <TouchableOpacity 
-            style={styles.modalOverlay} 
-            activeOpacity={1} 
-            onPress={closeModal}
-          >
-            <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-              <View style={styles.modalHeader}>
-                <View style={styles.modalIconContainer}>
-                  <Ionicons 
-                    name={selectedLesson.type === 'video' ? 'play' : 'book'} 
-                    size={32} 
-                    color={colors.text.primary} 
-                  />
-                </View>
-              </View>
-              
-              <Text style={styles.modalTitle}>{selectedLesson.title}</Text>
-              <Text style={styles.modalDescription}>{selectedLesson.description}</Text>
-              
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.readButton}>
-                  <Ionicons name="document-text-outline" size={20} color={colors.text.primary} />
-                  <Text style={styles.readButtonText}>Read</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.listenButton}>
-                  <Ionicons name="volume-high-outline" size={20} color={colors.text.primary} />
-                  <Text style={styles.listenButtonText}>Listen</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      )}
+      </View>
     </View>
   );
 };
@@ -365,28 +350,49 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   chapterHeader: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.surface,
     marginHorizontal: 20,
-    padding: 20,
+    padding: 16,
     borderRadius: 16,
     marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 5,
   },
   chapterBadge: {
     alignSelf: 'flex-start',
-    marginBottom: 8,
+    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(95, 203, 15, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(95, 203, 15, 0.2)',
   },
   chapterBadgeText: {
-    color: colors.background,
+    color: colors.accent,
     fontSize: 11,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   chapterTitle: {
-    color: colors.background,
-    fontSize: 24,
-    fontWeight: 'bold',
+    color: colors.text.primary,
+    fontSize: 22,
+    fontWeight: '800',
     fontFamily: 'Inter_700Bold',
+    letterSpacing: -0.5,
+    lineHeight: 28,
   },
   pathContainer: {
     paddingHorizontal: PADDING,
@@ -460,7 +466,7 @@ const styles = StyleSheet.create({
   connectorHorizontal: {
     position: 'absolute',
     top: NODE_SIZE / 2 - LINE_WIDTH / 2, // Center the line vertically on node center
-    width: CONTAINER_WIDTH - NODE_SIZE - 120 + CORNER_RADIUS, // Span to corner
+    width: CONTAINER_WIDTH - 120 - 3*CORNER_RADIUS, // Span from node to start of curve
     height: LINE_WIDTH,
     backgroundColor: colors.border,
     zIndex: 1,
@@ -490,23 +496,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  modalContent: {
+  // Popup Styles
+  inlinePopup: {
+    position: 'absolute',
+    top: NODE_SIZE - 15, // Overlap slightly with node area (arrow will touch button)
+    width: CONTAINER_WIDTH,
     backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 24,
-    width: '100%',
-    maxWidth: 340,
-    alignItems: 'center',
+    borderRadius: 16,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 10,
+      height: 4,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 10,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.surfaceBorder,
+    zIndex: 100,
+  },
+  popupLeft: {
+    left: 0,
+  },
+  popupRight: {
+    right: 0,
+  },
+  popupArrow: {
+    position: 'absolute',
+    top: -10,
+    width: 20,
+    height: 20,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: colors.surfaceBorder,
+    transform: [{ rotate: '45deg' }],
+  },
+  arrowLeft: {
+    left: 60 - 10, // Center of node (60) - half arrow width (10)
+  },
+  arrowRight: {
+    right: 60 - 10, // Center of node (60) - half arrow width (10)
+  },
+  popupTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    marginBottom: 8,
+    fontFamily: 'Inter_700Bold',
+  },
+  popupDescription: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginBottom: 20,
+    fontFamily: 'Inter_500Medium',
+  },
+  popupButtons: {
+    flexDirection: 'row',
+    gap: 12,
   },
   modalHeader: {
     marginBottom: 16,
@@ -570,5 +618,13 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
+  },
+  lockedButton: {
+    backgroundColor: '#3F3F46', // Lighter grey than surface (#292929) for visibility
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  lockedButtonText: {
+    color: '#A1A1AA', // Secondary text color
   },
 });

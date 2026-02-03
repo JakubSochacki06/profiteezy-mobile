@@ -3,6 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreen } from '../screens/HomeScreen';
+import { ChallengesScreen } from '../screens/ChallengesScreen';
 import { CoursesScreen } from '../screens/CoursesScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { colors } from '../theme/colors';
@@ -10,6 +11,7 @@ import { Platform } from 'react-native';
 
 export type MainTabParamList = {
   Home: undefined;
+  Challenges: undefined;
   Courses: undefined;
   Profile: undefined;
 };
@@ -34,6 +36,8 @@ export const MainTabNavigator = () => {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'Challenges') {
+            iconName = focused ? 'trophy' : 'trophy-outline';
           } else if (route.name === 'Courses') {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Profile') {
@@ -66,7 +70,14 @@ export const MainTabNavigator = () => {
         }}
       />
       <Tab.Screen 
-        name="Courses" 
+        name="Challenges" 
+        component={ChallengesScreen}
+        options={{
+          tabBarLabel: 'Challenges',
+        }}
+      />
+      <Tab.Screen 
+        name="Courses"  
         component={CoursesScreen}
         options={{
           tabBarLabel: 'Courses',

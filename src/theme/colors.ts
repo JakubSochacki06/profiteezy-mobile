@@ -15,7 +15,7 @@ export const colors = {
   
   // Surface color (buttons, cards, elevated surfaces)
   surface: '#292929',
-  
+  surfaceBorder: 'rgba(255,255,255,0.1)',
   
   // Accent color (highlights, CTAs, important elements)
   accent: '#5FCB0F',
