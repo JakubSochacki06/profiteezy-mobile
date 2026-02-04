@@ -10,13 +10,26 @@ import {
   Platform,
   Animated,
   Image,
+  Modal,
+  TouchableWithoutFeedback,
+  Easing,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { colors } from '../theme/colors';
 import { QuestionnaireNavigator, questionnaireData, QuestionnaireResult } from '../questionnaire';
 import { usePaywall } from '../hooks/usePaywall';
 import { MainTabNavigator } from '../navigation';
+import {
+  GoogleSignin,
+  isSuccessResponse,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
+import { supabase } from '../lib/supabase';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,6 +40,14 @@ interface Bubble {
   opacity: Animated.Value;
   scale: Animated.Value;
 }
+
+// Configure Google Sign-In - you need to get the webClientId from Google Cloud Console
+// Go to https://console.cloud.google.com/apis/credentials and create an OAuth 2.0 Client ID
+// For Expo/React Native, you need a Web application type client ID
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+  offlineAccess: true,
+});
 
 export const LoginScreen = () => {
   const [fontsLoaded] = useFonts({
@@ -40,6 +61,52 @@ export const LoginScreen = () => {
   const bubbleIdRef = useRef(0);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [showHome, setShowHome] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+  
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(height)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (showSignInModal) {
+      // Animate In
+      slideAnim.setValue(height);
+      fadeAnim.setValue(0);
+      
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+          easing: Easing.out(Easing.cubic),
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showSignInModal]);
+
+  const handleCloseModal = () => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: height,
+        duration: 300,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.cubic),
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowSignInModal(false);
+    });
+  };
 
   const { showPaywall } = usePaywall({
     placement: 'onboarding_complete',
@@ -65,8 +132,71 @@ export const LoginScreen = () => {
   };
 
   const handleSignIn = () => {
-    // TODO: Navigate to sign in
-    console.log('Sign in pressed');
+    setShowSignInModal(true);
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsGoogleSigningIn(true);
+      
+      // Check if device supports Google Play Services
+      await GoogleSignin.hasPlayServices();
+      
+      // Perform the Google Sign-In
+      const response = await GoogleSignin.signIn();
+      
+      if (isSuccessResponse(response)) {
+        // Get the ID token from the response
+        const idToken = response.data.idToken;
+        
+        if (!idToken) {
+          throw new Error('No ID token returned from Google Sign-In');
+        }
+        
+        // Sign in with Supabase using the ID token
+        const { data, error } = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: idToken,
+        });
+        
+        if (error) {
+          console.error('Supabase auth error:', error);
+          Alert.alert('Sign In Error', error.message);
+          return;
+        }
+        
+        if (data.session) {
+          console.log('Successfully signed in with Google!', data.user?.email);
+          // Close the modal and navigate to home
+          handleCloseModal();
+          setShowHome(true);
+        }
+      }
+    } catch (error: any) {
+      if (isErrorWithCode(error)) {
+        switch (error.code) {
+          case statusCodes.IN_PROGRESS:
+            // Sign-in is already in progress
+            console.log('Sign-in already in progress');
+            break;
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            Alert.alert('Error', 'Google Play Services is not available on this device');
+            break;
+          case statusCodes.SIGN_IN_CANCELLED:
+            // User cancelled the sign-in flow
+            console.log('User cancelled sign-in');
+            break;
+          default:
+            console.error('Google Sign-In error:', error);
+            Alert.alert('Sign In Error', 'An error occurred during Google Sign-In');
+        }
+      } else {
+        console.error('Unknown error:', error);
+        Alert.alert('Sign In Error', error.message || 'An unexpected error occurred');
+      }
+    } finally {
+      setIsGoogleSigningIn(false);
+    }
   };
 
   useEffect(() => {
@@ -263,6 +393,88 @@ export const LoginScreen = () => {
           </View>
         </View>
       </SafeAreaView>
+
+      {/* Sign In Modal */}
+      <Modal
+        animationType="none"
+        transparent={true}
+        visible={showSignInModal}
+        onRequestClose={handleCloseModal}
+      >
+        <TouchableWithoutFeedback onPress={handleCloseModal}>
+          <Animated.View 
+            style={[
+              styles.modalOverlay,
+              {
+                backgroundColor: fadeAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.5)'],
+                }),
+              }
+            ]}
+          >
+            <TouchableWithoutFeedback>
+              <Animated.View 
+                style={[
+                  styles.modalContent, 
+                  { 
+                    paddingBottom: insets.bottom + 20,
+                    transform: [{ translateY: slideAnim }]
+                  }
+                ]}
+              >
+                {/* Header */}
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Sign in</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton} 
+                    onPress={handleCloseModal}
+                  >
+                    <Ionicons name="close" size={24} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Sign In Options */}
+                <View style={styles.modalBody}>
+                  <TouchableOpacity 
+                    style={[styles.authButton, isGoogleSigningIn && styles.authButtonDisabled]}
+                    onPress={handleGoogleSignIn}
+                    disabled={isGoogleSigningIn}
+                    activeOpacity={0.7}
+                  >
+                    {isGoogleSigningIn ? (
+                      <ActivityIndicator size="small" color={colors.text.primary} style={styles.authIcon} />
+                    ) : (
+                      <Image 
+                        source={require('../../assets/logos/googleLogo.png')} 
+                        style={styles.googleLogo}
+                        resizeMode="contain"
+                      />
+                    )}
+                    <Text style={styles.authButtonText}>
+                      {isGoogleSigningIn ? 'Signing in...' : 'Sign in with Google'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.authButton}>
+                    <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
+                    <Text style={styles.authButtonText}>Sign in with Email</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Footer */}
+                <View style={styles.modalFooter}>
+                  <Text style={styles.footerText}>
+                    By continuing, you agree to Profiteezy's{' '}
+                    <Text style={styles.footerLink}>Terms and Conditions</Text> and{' '}
+                    <Text style={styles.footerLink}>Privacy Policy</Text>
+                  </Text>
+                </View>
+              </Animated.View>
+            </TouchableWithoutFeedback>
+          </Animated.View>
+        </TouchableWithoutFeedback>
+      </Modal>
     </View>
   );
 };
@@ -410,5 +622,80 @@ const styles = StyleSheet.create({
   },
   debugButtonText: {
     fontSize: 24,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 32,
+    position: 'relative',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.text.primary,
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 0,
+    padding: 4,
+    backgroundColor: colors.border,
+    borderRadius: 20,
+  },
+  modalBody: {
+    gap: 16,
+    marginBottom: 32,
+  },
+  authButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    backgroundColor: 'transparent',
+  },
+  authButtonDisabled: {
+    opacity: 0.6,
+  },
+  authIcon: {
+    marginRight: 12,
+  },
+  googleLogo: {
+    width: 20,
+    height: 20,
+    marginRight: 12,
+  },
+  authButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.text.primary,
+  },
+  modalFooter: {
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  footerLink: {
+    textDecorationLine: 'underline',
+    color: colors.text.primary,
   },
 });

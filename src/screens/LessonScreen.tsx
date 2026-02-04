@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,15 @@ import {
   ScrollView,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { Button } from '../components/Button';
+import { IconButton } from '../components';
 import { Task, LessonStage } from '../types/lesson';
+import { supabase } from '../lib/supabase';
 
 // Task Components
 import { MultipleChoiceTask } from '../components/lesson/tasks/MultipleChoiceTask';
@@ -21,6 +25,7 @@ import { FreeTextTask } from '../components/lesson/tasks/FreeTextTask';
 import { BranchingScenarioTask } from '../components/lesson/tasks/BranchingScenarioTask';
 
 interface LessonScreenProps {
+  lessonId?: string;
   onClose: () => void;
   onComplete: () => void;
   title?: string;
@@ -28,109 +33,19 @@ interface LessonScreenProps {
 
 const { width } = Dimensions.get('window');
 
-// --- Dummy Data ---
-
-const LESSON_STAGES: LessonStage[] = [
-  {
-    id: '1',
-    title: 'What is ChatGPT?',
-    content: "Hey there! Today, we're diving into the world of ChatGPT, an advanced large language model (LLM). It's like a super-smart chatbot that can understand and generate human-like text.",
-    image: require('../../assets/questionnaire/questionnaireImage1.png'),
-  },
-  {
-    id: '2',
-    title: 'How does it work?',
-    content: "ChatGPT has been trained on a massive amount of text from the internet. It predicts the next word in a sentence, much like autocomplete on your phone, but way more advanced.",
-    image: require('../../assets/emojis/laptopEmoji.png'),
-  },
-  {
-    id: '3',
-    title: 'Prompt Engineering',
-    content: "The quality of the answer depends on the quality of your question. This is called 'Prompt Engineering'. Being specific helps you get better results.",
-  },
-  {
-    id: '4',
-    title: 'Safety & Limitations',
-    content: "While powerful, ChatGPT can sometimes make mistakes (hallucinations). It's important to verify information, especially for critical tasks.",
-    image: require('../../assets/emojis/confusedEmoji.png'),
-  },
-];
-
-const TASKS: Task[] = [
-  {
-    id: 't1',
-    type: 'multiple_choice',
-    question: "What does LLM stand for?",
-    options: ["Large Learning Model", "Large Language Model", "Long Language Machine", "Little Learning Machine"],
-    correctIndex: 1,
-  },
-  {
-    id: 't2',
-    type: 'drag_drop',
-    question: "Order the steps of using an LLM:",
-    items: ["Model Processes", "Receive Answer", "Write Prompt", "Send Request"],
-    correctOrder: ["Write Prompt", "Send Request", "Model Processes", "Receive Answer"],
-  },
-  {
-    id: 't3',
-    type: 'sort',
-    question: "Categorize the capabilities:",
-    categories: [
-      { id: 'c1', name: 'Can Do' },
-      { id: 'c2', name: 'Cannot Do' }
-    ],
-    items: [
-      { id: 'i1', content: "Write a poem", categoryId: 'c1' },
-      { id: 'i2', content: "Predict the future", categoryId: 'c2' },
-      { id: 'i3', content: "Summarize text", categoryId: 'c1' },
-      { id: 'i4', content: "Access real-time private thoughts", categoryId: 'c2' }
-    ]
-  },
-  {
-    id: 't4',
-    type: 'fill_word',
-    question: "Complete the sentence:",
-    sentence: "Prompt engineering is the art of asking ___ questions to get ___ results.",
-    segments: ["Prompt engineering is the art of asking ", null, " questions to get ", null, " results."],
-    words: ["better", "worse", "random", "specific", "vague"],
-    correctWords: ["specific", "better"]
-  },
-  {
-    id: 't5',
-    type: 'free_text',
-    question: "Write a prompt:",
-    prompt: "Write a short prompt asking for a healthy dinner recipe.",
-    minChars: 20
-  },
-  {
-    id: 't6',
-    type: 'branching_scenario',
-    question: "Scenario: Learning Python",
-    startScenarioId: 'start',
-    scenarios: {
-      'start': {
-        text: "You want to learn Python. How do you ask ChatGPT?",
-        choices: [
-          { text: "Teach me Python.", nextId: 's1_broad' },
-          { text: "Create a 4-week study plan for a Python beginner.", nextId: 'win' }
-        ]
-      },
-      's1_broad': {
-        text: "ChatGPT gives you a generic definition of Python. It's too broad. Try again.",
-        choices: [
-          { text: "Try again with more specific details.", nextId: 'start' }
-        ]
-      }
-    }
-  }
-];
-
 export const LessonScreen: React.FC<LessonScreenProps> = ({ 
+  lessonId,
   onClose, 
   onComplete,
-  title = "What is ChatGPT?" 
+  title = "Lesson" 
 }) => {
   const insets = useSafeAreaInsets();
+  
+  // Data fetching state
+  const [lessonStages, setLessonStages] = useState<LessonStage[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // State
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
@@ -141,32 +56,121 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
   const [buttonTitle, setButtonTitle] = useState('Continue');
   const [taskSubmitHandler, setTaskSubmitHandler] = useState<(() => void) | null>(null);
 
+  useEffect(() => {
+    if (lessonId) {
+      fetchLessonData();
+    } else {
+      setLoading(false);
+      setError('No lesson ID provided');
+    }
+  }, [lessonId]);
+
+  const fetchLessonData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('=== FETCHING LESSON DATA ===');
+      console.log('Lesson ID:', lessonId);
+
+      // Fetch lesson stages (content slides)
+      const { data: stagesData, error: stagesError } = await supabase
+        .from('lesson_stages')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .order('order_number', { ascending: true });
+
+      if (stagesError) throw stagesError;
+
+      console.log('=== LESSON STAGES ===');
+      console.log(`Found ${stagesData?.length || 0} stages`);
+
+      // Fetch interactive tasks (quizzes)
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('interactive_tasks')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .order('order_number', { ascending: true });
+
+      if (tasksError) throw tasksError;
+
+      console.log('=== INTERACTIVE TASKS ===');
+      console.log(`Found ${tasksData?.length || 0} tasks`);
+
+      // Transform stages data
+      const transformedStages: LessonStage[] = (stagesData || []).map((stage: any) => ({
+        id: stage.id,
+        title: stage.title || '',
+        content: stage.content || '',
+        image: undefined, // lesson_stages don't have images in this DB
+      }));
+
+      // Transform tasks data - map database format to component format
+      const transformedTasks: Task[] = (tasksData || []).map((task: any) => {
+        // Map database task type to our component types
+        const taskType = task.type || 'multiple_choice';
+        const data = task.data || {};
+
+        // Handle multiple_choice tasks
+        if (taskType === 'multiple_choice') {
+          return {
+            id: task.id,
+            type: 'multiple_choice',
+            question: task.prompt || '',
+            options: data.choices || [],
+            correctIndex: data.correct_answer ?? 0,
+          } as Task;
+        }
+
+        // Handle other task types
+        return {
+          id: task.id,
+          type: taskType,
+          question: task.prompt || '',
+          ...data,
+        } as Task;
+      });
+
+      console.log('=== TRANSFORMED DATA ===');
+      console.log(`Stages: ${transformedStages.length}, Tasks: ${transformedTasks.length}`);
+
+      setLessonStages(transformedStages);
+      setTasks(transformedTasks);
+    } catch (err: any) {
+      console.error('=== ERROR FETCHING LESSON DATA ===');
+      console.error('Error:', err);
+      setError(err.message || 'Failed to fetch lesson data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Derived state
   const isLessonPhase = currentTaskIndex === -1;
-  const totalSteps = LESSON_STAGES.length + TASKS.length;
-  const currentStep = isLessonPhase ? currentStageIndex + 1 : LESSON_STAGES.length + currentTaskIndex + 1;
-  const progress = (currentStep / totalSteps) * 100;
+  const totalSteps = lessonStages.length || 1;
+  const currentProgressStep = isLessonPhase ? currentStageIndex + 1 : totalSteps;
+  const progress = (currentProgressStep / totalSteps) * 100;
 
   // Handlers
   const handleLessonContinue = () => {
-    if (currentStageIndex < LESSON_STAGES.length - 1) {
+    if (currentStageIndex < lessonStages.length - 1) {
       setCurrentStageIndex(currentStageIndex + 1);
-    } else {
+    } else if (tasks.length > 0) {
       // Move to tasks
       setCurrentTaskIndex(0);
+    } else {
+      // No tasks, complete the lesson
+      onComplete();
     }
   };
 
   const handleTaskComplete = useCallback((isCorrect: boolean) => {
-    // Logic for incorrect answers can be added here (e.g. tracking score)
-    // For now, we just move to next
-    if (currentTaskIndex < TASKS.length - 1) {
+    if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(currentTaskIndex + 1);
     } else {
-      // All done
       onComplete();
     }
-  }, [currentTaskIndex, onComplete]);
+  }, [currentTaskIndex, tasks.length, onComplete]);
 
   // Called by task components to register their submit handler
   const registerTaskControls = useCallback((
@@ -186,17 +190,42 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
       taskSubmitHandler();
     }
   };
+
+  // Strip markdown-like tags for display (simple version)
+  const stripCustomTags = (content: string): string => {
+    if (!content) return '';
+    // Remove custom tags like ::tips, ::common_mistake, etc.
+    return content
+      .replace(/::[\w_]+\r?\n/g, '\n')
+      .replace(/::\/([\w_]+)/g, '')
+      .replace(/^###\s*/gm, '')
+      .replace(/^\*\*(.+?)\*\*/gm, '$1')
+      .replace(/\*\*(.+?)\*\*/g, '$1')
+      .trim();
+  };
   
   // Render Lesson Content
   const renderLessonContent = () => {
-    const stage = LESSON_STAGES[currentStageIndex];
+    if (lessonStages.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="document-text-outline" size={64} color={colors.text.tertiary} />
+          <Text style={styles.emptyTitle}>No content yet</Text>
+          <Text style={styles.emptySubtitle}>This lesson doesn't have any content</Text>
+        </View>
+      );
+    }
+
+    const stage = lessonStages[currentStageIndex];
+    const cleanContent = stripCustomTags(stage.content);
+
     return (
       <ScrollView 
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{stage.title}</Text>
-        <Text style={styles.text}>{stage.content}</Text>
+        <Text style={styles.text}>{cleanContent}</Text>
         
         {stage.image && (
           <View style={styles.imageContainer}>
@@ -213,9 +242,13 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
   // Render Task Content
   const renderTaskContent = () => {
-    const task = TASKS[currentTaskIndex];
+    if (tasks.length === 0 || currentTaskIndex >= tasks.length) {
+      return null;
+    }
+
+    const task = tasks[currentTaskIndex];
+    if (!task) return null;
     
-    // We wrap tasks in a key to reset state when task changes
     const key = task.id;
 
     switch (task.type) {
@@ -232,16 +265,82 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
       case 'branching_scenario':
         return <BranchingScenarioTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
       default:
-        return <Text style={{color: 'white'}}>Unknown Task Type</Text>;
+        return <Text style={{color: 'white'}}>Unknown Task Type: {(task as any).type}</Text>;
     }
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <IconButton 
+            icon={<Ionicons name="close" size={24} color={colors.text.primary} />}
+            onPress={onClose}
+          />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingText}>Loading lesson...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <IconButton 
+            icon={<Ionicons name="close" size={24} color={colors.text.primary} />}
+            onPress={onClose}
+          />
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorSubtitle}>{error}</Text>
+        </View>
+      </View>
+    );
+  }
+
   // Determine button title for lesson phase
   const currentButtonTitle = isLessonPhase ? 'Continue' : buttonTitle;
-  const isButtonDisabled = isLessonPhase ? false : !canContinue;
+  const isButtonDisabled = isLessonPhase ? (lessonStages.length === 0) : !canContinue;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={styles.header}>
+        <IconButton 
+          icon={<Ionicons name="close" size={24} color={colors.text.primary} />}
+          onPress={onClose}
+        />
+        
+        <View style={styles.progressBarContainer}>
+          <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
+        </View>
+
+        <View style={styles.rewardsContainer}>
+          {[...Array(Math.min(tasks.length, 3) || 3)].map((_, index) => {
+            const isCompleted = !isLessonPhase && currentTaskIndex > index;
+            return (
+              <Text 
+                key={index} 
+                style={[
+                  styles.rewardText, 
+                  { color: isCompleted ? colors.accent : colors.text.tertiary }
+                ]}
+              >
+                $
+              </Text>
+            );
+          })}
+        </View>
+      </View>
+
       {/* Main Content */}
       <View style={styles.contentArea}>
         {isLessonPhase ? renderLessonContent() : renderTaskContent()}
@@ -281,7 +380,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 26,
     color: colors.text.secondary,
     marginBottom: 20,
     fontFamily: 'Inter_400Regular',
@@ -301,5 +400,89 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  progressBarContainer: {
+    flex: 1,
+    height: 8,
+    backgroundColor: colors.surface,
+    borderRadius: 4,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: colors.accent,
+    borderRadius: 4,
+  },
+  rewardsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 60,
+    gap: 4,
+  },
+  rewardText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    fontFamily: 'Inter_500Medium',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 12,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    textAlign: 'center',
+    fontFamily: 'Inter_700Bold',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    textAlign: 'center',
+    fontFamily: 'Inter_700Bold',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
   },
 });

@@ -27,6 +27,15 @@ export const MainTabNavigator = () => {
     ? 60 + bottomPadding 
     : 60 + bottomPadding;
 
+  const defaultTabBarStyle = {
+    backgroundColor: colors.surface,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    height: tabBarHeight,
+    paddingBottom: bottomPadding,
+    paddingTop: 8,
+  };
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -48,14 +57,6 @@ export const MainTabNavigator = () => {
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.text.tertiary,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-          height: tabBarHeight,
-          paddingBottom: bottomPadding,
-          paddingTop: 8,
-        },
         tabBarLabelStyle: {
           fontFamily: 'Inter_600SemiBold',
           fontSize: 12,
@@ -67,6 +68,7 @@ export const MainTabNavigator = () => {
         component={HomeScreen}
         options={{
           tabBarLabel: 'Home',
+          tabBarStyle: defaultTabBarStyle,
         }}
       />
       <Tab.Screen 
@@ -74,6 +76,7 @@ export const MainTabNavigator = () => {
         component={ChallengesScreen}
         options={{
           tabBarLabel: 'Challenges',
+          tabBarStyle: defaultTabBarStyle,
         }}
       />
       <Tab.Screen 
@@ -81,6 +84,7 @@ export const MainTabNavigator = () => {
         component={CoursesScreen}
         options={{
           tabBarLabel: 'Courses',
+          tabBarStyle: defaultTabBarStyle,
         }}
       />
       <Tab.Screen 
@@ -88,6 +92,7 @@ export const MainTabNavigator = () => {
         component={ProfileScreen}
         options={{
           tabBarLabel: 'Profile',
+          tabBarStyle: defaultTabBarStyle,
         }}
       />
     </Tab.Navigator>

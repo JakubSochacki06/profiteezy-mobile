@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,112 +6,39 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
-  Modal,
   StatusBar,
-  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { supabase } from '../lib/supabase';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 const NODE_SIZE = 90;
 const PADDING = 40;
-const NODE_MARGIN_BOTTOM = 0; // Gap between rows
+const NODE_MARGIN_BOTTOM = 0;
 const CONTAINER_WIDTH = width - (PADDING * 2);
-const CORNER_RADIUS = 20; // Radius for curved line corners
-const LINE_WIDTH = 5; // Width of connecting lines
+const CORNER_RADIUS = 20;
+const LINE_WIDTH = 5;
 
 interface Lesson {
   id: string;
   title: string;
-  description: string;
-  type: 'video' | 'article';
-  duration: string;
+  description: string | null;
+  duration: string | null;
+  number: number;
   isCompleted: boolean;
   isLocked: boolean;
 }
 
-interface Chapter {
+interface Stage {
   id: string;
   title: string;
+  description: string | null;
+  order: number;
   lessons: Lesson[];
 }
-
-const COURSE_DATA: Chapter[] = [
-  {
-    id: 'chapter-1',
-    title: 'Basics of ChatGPT',
-    lessons: [
-      {
-        id: '1',
-        title: 'ChatGPT as an LLM',
-        description: 'What is ChatGPT and How Does It Work?',
-        type: 'article',
-        duration: '5 min',
-        isCompleted: true,
-        isLocked: false,
-      },
-      {
-        id: '2',
-        title: 'Core Capabilities',
-        description: 'Understanding what ChatGPT can actually do for you.',
-        type: 'video',
-        duration: '8 min',
-        isCompleted: false,
-        isLocked: false,
-      },
-      {
-        id: '3',
-        title: 'Prompt Engineering',
-        description: 'The art of asking the right questions.',
-        type: 'article',
-        duration: '10 min',
-        isCompleted: false,
-        isLocked: true,
-      },
-    ],
-  },
-  {
-    id: 'chapter-2',
-    title: 'Advanced Techniques',
-    lessons: [
-      {
-        id: '4',
-        title: 'Context Windows',
-        description: 'How much can ChatGPT remember?',
-        type: 'video',
-        duration: '6 min',
-        isCompleted: false,
-        isLocked: true,
-      },
-      {
-        id: '5',
-        title: 'Advanced Settings',
-        description: 'Temperature, Top P and other parameters.',
-        type: 'article',
-        duration: '12 min',
-        isCompleted: false,
-        isLocked: true,
-      },
-    ],
-  },
-  {
-    id: 'chapter-3',
-    title: 'Real-World Applications',
-    lessons: [
-      {
-        id: '6',
-        title: 'Case Studies',
-        description: 'Case studies of successful ChatGPT usage.',
-        type: 'video',
-        duration: '15 min',
-        isCompleted: false,
-        isLocked: true,
-      },
-    ],
-  },
-];
 
 interface CoursePathScreenProps {
   course: any;
@@ -122,19 +49,100 @@ interface CoursePathScreenProps {
 export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBack, onStartLesson }) => {
   const insets = useSafeAreaInsets();
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  
+  // Data fetching state
+  const [stages, setStages] = useState<Stage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchCourseData();
+  }, [course.id]);
+
+  const fetchCourseData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log('=== FETCHING COURSE DATA ===');
+      console.log('Course ID:', course.id);
+
+      // Fetch stages for this course
+      const { data: stagesData, error: stagesError } = await supabase
+        .from('stages')
+        .select('*')
+        .eq('course_id', course.id)
+        .order('order', { ascending: true });
+
+      if (stagesError) throw stagesError;
+
+      console.log('=== STAGES ===');
+      console.log(JSON.stringify(stagesData, null, 2));
+
+      // Fetch lessons for this course
+      const { data: lessonsData, error: lessonsError } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('course_id', course.id)
+        .order('number', { ascending: true });
+
+      if (lessonsError) throw lessonsError;
+
+      console.log('=== LESSONS ===');
+      console.log(JSON.stringify(lessonsData, null, 2));
+
+      // Group lessons by stage
+      const stagesWithLessons: Stage[] = (stagesData || []).map((stage: any, stageIndex: number) => {
+        const stageLessons = (lessonsData || [])
+          .filter((lesson: any) => lesson.stage_id === stage.id)
+          .map((lesson: any, lessonIndex: number) => ({
+            id: lesson.id,
+            title: lesson.title,
+            description: lesson.description,
+            duration: lesson.duration,
+            number: lesson.number,
+            // First lesson of first stage is unlocked
+            // TODO: Calculate based on actual user progress
+            isCompleted: false,
+            isLocked: !(stageIndex === 0 && lessonIndex === 0),
+          }));
+
+        return {
+          id: stage.id,
+          title: stage.title,
+          description: stage.description,
+          order: stage.order,
+          lessons: stageLessons,
+        };
+      });
+
+      console.log('=== STAGES WITH LESSONS ===');
+      stagesWithLessons.forEach(s => {
+        console.log(`Stage: ${s.title} (${s.lessons.length} lessons)`);
+        s.lessons.forEach(l => console.log(`  - ${l.title}`));
+      });
+
+      setStages(stagesWithLessons);
+    } catch (err: any) {
+      console.error('=== ERROR FETCHING COURSE DATA ===');
+      console.error('Error:', err);
+      setError(err.message || 'Failed to fetch course data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLessonPress = (lesson: Lesson) => {
-    // if (lesson.isLocked) return; // Allow clicking locked lessons
     setSelectedLessonId(selectedLessonId === lesson.id ? null : lesson.id);
   };
 
   // Calculate completion rate
-  const totalLessons = COURSE_DATA.reduce((acc, chapter) => acc + chapter.lessons.length, 0);
-  const completedLessons = COURSE_DATA.reduce(
-    (acc, chapter) => acc + chapter.lessons.filter((l) => l.isCompleted).length,
+  const totalLessons = stages.reduce((acc, stage) => acc + stage.lessons.length, 0);
+  const completedLessons = stages.reduce(
+    (acc, stage) => acc + stage.lessons.filter((l) => l.isCompleted).length,
     0
   );
-  const completionRate = Math.round((completedLessons / totalLessons) * 100);
+  const completionRate = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
   const renderPath = (lessons: Lesson[]) => {
     return (
@@ -157,39 +165,36 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
               {/* Connector Lines with curved corners */}
               {!isLast && (
                 <>
-                  {/* Horizontal Line connecting from node to corner */}
                   <View style={[
                     styles.connectorHorizontal,
                     isLeft ? { 
-                      left: NODE_SIZE / 2 + 60, // Start after the node wrapper (120/2)
+                      left: NODE_SIZE / 2 + 60,
                     } : { 
-                      right: NODE_SIZE / 2 + 60, // Start after the node wrapper (120/2)
+                      right: NODE_SIZE / 2 + 60,
                     },
                   ]} />
                   
-                  {/* Corner piece - curved connection */}
                   <View style={[
                     styles.connectorCorner,
                     isLeft ? { 
-                      right: 60 - LINE_WIDTH, // Position at the right side
+                      right: 60 - LINE_WIDTH,
                       borderRightWidth: LINE_WIDTH,
                       borderTopWidth: LINE_WIDTH,
                       borderTopRightRadius: CORNER_RADIUS,
                     } : { 
-                      left: 60 - LINE_WIDTH, // Position at the left side
+                      left: 60 - LINE_WIDTH,
                       borderLeftWidth: LINE_WIDTH,
                       borderTopWidth: LINE_WIDTH,
                       borderTopLeftRadius: CORNER_RADIUS,
                     },
                   ]} />
                   
-                  {/* Vertical Line dropping down to next row */}
                   <View style={[
                     styles.connectorVertical,
                     isLeft ? { 
-                      right: 60 - LINE_WIDTH, // Align with next node center
+                      right: 60 - LINE_WIDTH,
                     } : { 
-                      left: 60 - LINE_WIDTH, // Align with next node center
+                      left: 60 - LINE_WIDTH,
                     },
                   ]} />
                 </>
@@ -205,18 +210,17 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
                   ]}
                   onPress={() => handleLessonPress(lesson)}
                   activeOpacity={0.8}
-                  // disabled={lesson.isLocked} // Allow clicking locked lessons
                 >
                   <Ionicons 
-                    name={lesson.type === 'video' ? 'play' : 'book'} 
+                    name="book" 
                     size={32} 
                     color={lesson.isLocked ? colors.text.tertiary : colors.text.primary} 
                   />
-                      {lesson.isCompleted && (
-                        <View style={styles.checkBadge}>
-                          <Ionicons name="checkmark" size={14} color={colors.text.primary} />
-                        </View>
-                      )}
+                  {lesson.isCompleted && (
+                    <View style={styles.checkBadge}>
+                      <Ionicons name="checkmark" size={14} color={colors.text.primary} />
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <Text style={[
                   styles.nodeTitle,
@@ -232,7 +236,10 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
                   <View style={[styles.popupArrow, isLeft ? styles.arrowLeft : styles.arrowRight]} />
                   
                   <Text style={styles.popupTitle}>{lesson.title}</Text>
-                  <Text style={styles.popupDescription}>{lesson.description}</Text>
+                  <Text style={styles.popupDescription}>{lesson.description || 'No description available'}</Text>
+                  {lesson.duration && (
+                    <Text style={styles.popupDuration}>{lesson.duration}</Text>
+                  )}
                   
                   <View style={styles.popupButtons}>
                     {lesson.isLocked ? (
@@ -259,6 +266,46 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
     );
   };
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={styles.loadingText}>Loading course...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
+        </View>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorSubtitle}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchCourseData}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
@@ -277,27 +324,44 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
 
       {/* Path Content */}
       <View style={{flex: 1}}>
-        <ScrollView 
+        {stages.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="book-outline" size={64} color={colors.text.tertiary} />
+            <Text style={styles.emptyTitle}>No lessons yet</Text>
+            <Text style={styles.emptySubtitle}>This course doesn't have any lessons yet</Text>
+          </View>
+        ) : (
+          <ScrollView 
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-        >
-            {COURSE_DATA.map((chapter, chapterIndex) => (
-          <View key={chapter.id} style={styles.chapterContainer}>
-            {/* Chapter Header */}
-            <View style={styles.chapterHeader}>
-              <Text style={styles.chapterTitle}>{chapter.title}</Text>
-              <View style={styles.chapterBadge}>
-                <Text style={styles.chapterBadgeText}>
-                  AI MASTERY • {course.title.toUpperCase()}: LEVEL {chapterIndex + 1}
-                </Text>
-              </View>
-            </View>
+          >
+            {stages.map((stage, stageIndex) => (
+              <View key={stage.id} style={styles.chapterContainer}>
+                {/* Stage Header */}
+                <View style={styles.chapterHeader}>
+                  <Text style={styles.chapterTitle}>{stage.title}</Text>
+                  {stage.description && (
+                    <Text style={styles.chapterDescription} numberOfLines={2}>
+                      {stage.description}
+                    </Text>
+                  )}
+                  <View style={styles.chapterBadge}>
+                    <Text style={styles.chapterBadgeText}>
+                      STAGE {stageIndex + 1} • {stage.lessons.length} LESSONS
+                    </Text>
+                  </View>
+                </View>
 
-            {/* Lessons Path */}
-            {renderPath(chapter.lessons)}
-          </View>
-        ))}
-      </ScrollView>
+                {/* Lessons Path */}
+                {stage.lessons.length > 0 ? (
+                  renderPath(stage.lessons)
+                ) : (
+                  <Text style={styles.noLessonsText}>No lessons in this stage yet</Text>
+                )}
+              </View>
+            ))}
+          </ScrollView>
+        )}
       </View>
     </View>
   );
@@ -394,6 +458,13 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     lineHeight: 28,
   },
+  chapterDescription: {
+    color: colors.text.secondary,
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    marginTop: 8,
+    lineHeight: 20,
+  },
   pathContainer: {
     paddingHorizontal: PADDING,
   },
@@ -401,12 +472,12 @@ const styles = StyleSheet.create({
     width: '100%',
     marginBottom: NODE_MARGIN_BOTTOM,
     position: 'relative',
-    minHeight: NODE_SIZE + 40, // Ensure space for title
+    minHeight: NODE_SIZE + 40,
   },
   nodeWrapper: {
     alignItems: 'center',
-    width: 120, // Fixed width for alignment consistency
-    zIndex: 2, // Above lines
+    width: 120,
+    zIndex: 2,
   },
   node: {
     width: NODE_SIZE,
@@ -462,18 +533,17 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.background,
   },
-  // Lines
   connectorHorizontal: {
     position: 'absolute',
-    top: NODE_SIZE / 2 - LINE_WIDTH / 2, // Center the line vertically on node center
-    width: CONTAINER_WIDTH - 120 - 3*CORNER_RADIUS, // Span from node to start of curve
+    top: NODE_SIZE / 2 - LINE_WIDTH / 2,
+    width: CONTAINER_WIDTH - 120 - 3*CORNER_RADIUS,
     height: LINE_WIDTH,
     backgroundColor: colors.border,
     zIndex: 1,
   },
   connectorCorner: {
     position: 'absolute',
-    top: NODE_SIZE / 2 - LINE_WIDTH / 2, // Start from node center
+    top: NODE_SIZE / 2 - LINE_WIDTH / 2,
     width: CORNER_RADIUS,
     height: CORNER_RADIUS,
     borderColor: colors.border,
@@ -481,25 +551,15 @@ const styles = StyleSheet.create({
   },
   connectorVertical: {
     position: 'absolute',
-    top: NODE_SIZE / 2 - LINE_WIDTH / 2 + CORNER_RADIUS, // Start after corner
-    height: NODE_SIZE + NODE_MARGIN_BOTTOM - CORNER_RADIUS + LINE_WIDTH, // Reach next node center
+    top: NODE_SIZE / 2 - LINE_WIDTH / 2 + CORNER_RADIUS,
+    height: NODE_SIZE + NODE_MARGIN_BOTTOM - CORNER_RADIUS + LINE_WIDTH,
     width: LINE_WIDTH,
     backgroundColor: colors.border,
     zIndex: 1,
   },
-  
-  // Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  // Popup Styles
   inlinePopup: {
     position: 'absolute',
-    top: NODE_SIZE - 15, // Overlap slightly with node area (arrow will touch button)
+    top: NODE_SIZE - 15,
     width: CONTAINER_WIDTH,
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -534,10 +594,10 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
   },
   arrowLeft: {
-    left: 60 - 10, // Center of node (60) - half arrow width (10)
+    left: 60 - 10,
   },
   arrowRight: {
-    right: 60 - 10, // Center of node (60) - half arrow width (10)
+    right: 60 - 10,
   },
   popupTitle: {
     fontSize: 18,
@@ -549,60 +609,18 @@ const styles = StyleSheet.create({
   popupDescription: {
     fontSize: 14,
     color: colors.text.secondary,
-    marginBottom: 20,
+    marginBottom: 8,
     fontFamily: 'Inter_500Medium',
+  },
+  popupDuration: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    marginBottom: 16,
+    fontFamily: 'Inter_400Regular',
   },
   popupButtons: {
     flexDirection: 'row',
     gap: 12,
-  },
-  modalHeader: {
-    marginBottom: 16,
-  },
-  modalIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 8,
-    textAlign: 'center',
-    fontFamily: 'Inter_700Bold',
-  },
-  modalDescription: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginBottom: 24,
-    textAlign: 'center',
-    fontFamily: 'Inter_500Medium',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    width: '100%',
-    gap: 12,
-  },
-  readButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 8,
-  },
-  readButtonText: {
-    color: colors.text.primary,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
   },
   listenButton: {
     flex: 1,
@@ -620,11 +638,82 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
   },
   lockedButton: {
-    backgroundColor: '#3F3F46', // Lighter grey than surface (#292929) for visibility
+    backgroundColor: '#3F3F46',
     borderWidth: 1,
     borderColor: colors.border,
   },
   lockedButtonText: {
-    color: '#A1A1AA', // Secondary text color
+    color: '#A1A1AA',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    fontFamily: 'Inter_500Medium',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 12,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    textAlign: 'center',
+    fontFamily: 'Inter_700Bold',
+  },
+  errorSubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.background,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    textAlign: 'center',
+    fontFamily: 'Inter_700Bold',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+  },
+  noLessonsText: {
+    color: colors.text.tertiary,
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    paddingHorizontal: PADDING,
   },
 });

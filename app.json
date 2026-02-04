@@ -27,23 +27,13 @@
       "predictiveBackGestureEnabled": false
     },
     "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "minSdkVersion": 21
-          },
-          "ios": {
-            "deploymentTarget": "15.1"
-          }
-        }
-      ]
+      "expo-build-properties",
+      "expo-web-browser",
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin"
     ],
     "web": {
       "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "expo-build-properties"
-    ]
+    }
   }
 }
