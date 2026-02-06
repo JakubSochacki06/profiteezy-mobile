@@ -219,6 +219,7 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
         lines.forEach(line => {
           const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
+          const imageMatch = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
           if (headerMatch) {
             // If we have buffered text, push it first
             if (currentTextBuffer.trim()) {
@@ -227,6 +228,12 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
             }
             // Push the header
             finalBlocks.push({ type: 'header', content: headerMatch[2].trim() });
+          } else if (imageMatch) {
+            if (currentTextBuffer.trim()) {
+              finalBlocks.push({ type: 'text', content: currentTextBuffer.trim() });
+              currentTextBuffer = '';
+            }
+            finalBlocks.push({ type: 'image', content: imageMatch[2].trim() });
           } else {
             // Preserve newlines for text flow, but might want to handle lists better later
             currentTextBuffer += line + '\n';
@@ -290,6 +297,18 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
               <Text key={index} style={styles.subHeader}>
                 {block.content}
               </Text>
+            );
+          }
+
+          if (block.type === 'image') {
+            return (
+              <View key={index} style={styles.contentImageContainer}>
+                <Image
+                  source={{ uri: block.content }}
+                  style={styles.contentImage}
+                  resizeMode="contain"
+                />
+              </View>
             );
           }
 
@@ -648,5 +667,16 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     color: colors.text.secondary,
     fontFamily: 'Inter_400Regular',
+  },
+  contentImageContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  contentImage: {
+    width: width - 48,
+    height: (width - 48) * 0.6,
+    borderRadius: 12,
   },
 });
