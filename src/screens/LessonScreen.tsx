@@ -33,24 +33,24 @@ interface LessonScreenProps {
 
 const { width } = Dimensions.get('window');
 
-export const LessonScreen: React.FC<LessonScreenProps> = ({ 
+export const LessonScreen: React.FC<LessonScreenProps> = ({
   lessonId,
-  onClose, 
+  onClose,
   onComplete,
-  title = "Lesson" 
+  title = "Lesson"
 }) => {
   const insets = useSafeAreaInsets();
-  
+
   // Data fetching state
   const [lessonStages, setLessonStages] = useState<LessonStage[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // State
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(-1); // -1 means we are in lesson stages
-  
+
   // Task state management - lifted up from task components
   const [canContinue, setCanContinue] = useState(true); // For lesson phases, always true
   const [buttonTitle, setButtonTitle] = useState('Continue');
@@ -174,8 +174,8 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
   // Called by task components to register their submit handler
   const registerTaskControls = useCallback((
-    canSubmit: boolean, 
-    title: string, 
+    canSubmit: boolean,
+    title: string,
     onSubmit: () => void
   ) => {
     setCanContinue(canSubmit);
@@ -191,19 +191,77 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
     }
   };
 
-  // Strip markdown-like tags for display (simple version)
-  const stripCustomTags = (content: string): string => {
-    if (!content) return '';
-    // Remove custom tags like ::tips, ::common_mistake, etc.
-    return content
-      .replace(/::[\w_]+\r?\n/g, '\n')
-      .replace(/::\/([\w_]+)/g, '')
-      .replace(/^###\s*/gm, '')
-      .replace(/^\*\*(.+?)\*\*/gm, '$1')
-      .replace(/\*\*(.+?)\*\*/g, '$1')
-      .trim();
+  // parser for custom content
+  const parseLessonContent = useCallback((content: string) => {
+    if (!content) return [];
+
+    // 1. First split by the complex custom boxes
+    const boxRegex = /(::(?:real_world_example|tips|common_mistake)(?:[\s\S]*?)::\/(?:real_world_example|tips|common_mistake))/g;
+    const parts = content.split(boxRegex);
+
+    const finalBlocks: Array<{ type: string, content: string }> = [];
+
+    parts.forEach(part => {
+      // Check for custom boxes first
+      if (part.startsWith('::real_world_example')) {
+        const inner = part.replace(/::real_world_example\s*/, '').replace(/\s*::\/real_world_example/, '');
+        finalBlocks.push({ type: 'real_world_example', content: inner.trim() });
+      } else if (part.startsWith('::tips')) {
+        const inner = part.replace(/::tips\s*/, '').replace(/\s*::\/tips/, '');
+        finalBlocks.push({ type: 'tips', content: inner.trim() });
+      } else if (part.startsWith('::common_mistake')) {
+        const inner = part.replace(/::common_mistake\s*/, '').replace(/\s*::\/common_mistake/, '');
+        finalBlocks.push({ type: 'common_mistake', content: inner.trim() });
+      } else {
+        // 2. For regular text, check for headers line-by-line
+        const lines = part.split('\n');
+        let currentTextBuffer = '';
+
+        lines.forEach(line => {
+          const headerMatch = line.match(/^(#{1,6})\s+(.*)$/);
+          if (headerMatch) {
+            // If we have buffered text, push it first
+            if (currentTextBuffer.trim()) {
+              finalBlocks.push({ type: 'text', content: currentTextBuffer.trim() });
+              currentTextBuffer = '';
+            }
+            // Push the header
+            finalBlocks.push({ type: 'header', content: headerMatch[2].trim() });
+          } else {
+            // Preserve newlines for text flow, but might want to handle lists better later
+            currentTextBuffer += line + '\n';
+          }
+        });
+
+        if (currentTextBuffer.trim()) {
+          finalBlocks.push({ type: 'text', content: currentTextBuffer.trim() });
+        }
+      }
+    });
+
+    return finalBlocks.filter(b => b.content);
+  }, []);
+
+  const renderFormattedText = (text: string, baseStyle: any) => {
+    // Handle bold text **bold**
+    const parts = text.split(/(\*\*.*?\*\*)/g);
+
+    return (
+      <Text style={baseStyle}>
+        {parts.map((part, index) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <Text key={index} style={{ fontWeight: 'bold', color: colors.text.primary }}>
+                {part.slice(2, -2)}
+              </Text>
+            );
+          }
+          return <Text key={index}>{part}</Text>;
+        })}
+      </Text>
+    );
   };
-  
+
   // Render Lesson Content
   const renderLessonContent = () => {
     if (lessonStages.length === 0) {
@@ -217,20 +275,92 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
     }
 
     const stage = lessonStages[currentStageIndex];
-    const cleanContent = stripCustomTags(stage.content);
+    const contentBlocks = parseLessonContent(stage.content);
 
     return (
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>{stage.title}</Text>
-        <Text style={styles.text}>{cleanContent}</Text>
-        
+
+        {contentBlocks.map((block, index) => {
+          if (block.type === 'header') {
+            return (
+              <Text key={index} style={styles.subHeader}>
+                {block.content}
+              </Text>
+            );
+          }
+
+          if (block.type === 'text') {
+            return (
+              <View key={index} style={{ marginBottom: 20 }}>
+                {renderFormattedText(block.content, styles.text)}
+              </View>
+            );
+          } // Parse specific boxes
+
+          let boxConfig: {
+            icon: string;
+            title: string;
+            color: string;
+            bg: string;
+            borderColor: string;
+          } = {
+            icon: 'information-circle-outline',
+            title: 'Info',
+            color: colors.info,
+            bg: 'rgba(59, 130, 246, 0.1)', // info with opacity
+            borderColor: colors.info
+          };
+
+          if (block.type === 'real_world_example') {
+            boxConfig = {
+              icon: 'briefcase-outline',
+              title: 'Real World Example',
+              color: colors.info,
+              bg: 'rgba(59, 130, 246, 0.1)',
+              borderColor: colors.info
+            };
+          } else if (block.type === 'tips') {
+            boxConfig = {
+              icon: 'bulb-outline',
+              title: 'Pro Tip',
+              color: colors.success,
+              bg: 'rgba(95, 203, 15, 0.1)',
+              borderColor: colors.success
+            };
+          } else if (block.type === 'common_mistake') {
+            boxConfig = {
+              icon: 'warning-outline',
+              title: 'Common Mistake',
+              color: colors.error,
+              bg: 'rgba(239, 68, 68, 0.1)',
+              borderColor: colors.error
+            };
+          }
+
+          return (
+            <View key={index} style={[
+              styles.boxContainer,
+              { backgroundColor: boxConfig.bg, borderColor: boxConfig.borderColor }
+            ]}>
+              <View style={styles.boxHeader}>
+                <Ionicons name={boxConfig.icon as any} size={20} color={boxConfig.color} />
+                <Text style={[styles.boxTitle, { color: boxConfig.color }]}>
+                  {boxConfig.title}
+                </Text>
+              </View>
+              {renderFormattedText(block.content, styles.boxText)}
+            </View>
+          );
+        })}
+
         {stage.image && (
           <View style={styles.imageContainer}>
-            <Image 
-              source={stage.image} 
+            <Image
+              source={stage.image}
               style={styles.illustration}
               resizeMode="contain"
             />
@@ -248,7 +378,7 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
     const task = tasks[currentTaskIndex];
     if (!task) return null;
-    
+
     const key = task.id;
 
     switch (task.type) {
@@ -265,7 +395,7 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
       case 'branching_scenario':
         return <BranchingScenarioTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
       default:
-        return <Text style={{color: 'white'}}>Unknown Task Type: {(task as any).type}</Text>;
+        return <Text style={{ color: 'white' }}>Unknown Task Type: {(task as any).type}</Text>;
     }
   };
 
@@ -274,7 +404,7 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <IconButton 
+          <IconButton
             icon={<Ionicons name="close" size={24} color={colors.text.primary} />}
             onPress={onClose}
           />
@@ -292,7 +422,7 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <IconButton 
+          <IconButton
             icon={<Ionicons name="close" size={24} color={colors.text.primary} />}
             onPress={onClose}
           />
@@ -314,11 +444,11 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <IconButton 
+        <IconButton
           icon={<Ionicons name="close" size={24} color={colors.text.primary} />}
           onPress={onClose}
         />
-        
+
         <View style={styles.progressBarContainer}>
           <View style={[styles.progressBarFill, { width: `${progress}%` }]} />
         </View>
@@ -327,10 +457,10 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
           {[...Array(Math.min(tasks.length, 3) || 3)].map((_, index) => {
             const isCompleted = !isLessonPhase && currentTaskIndex > index;
             return (
-              <Text 
-                key={index} 
+              <Text
+                key={index}
                 style={[
-                  styles.rewardText, 
+                  styles.rewardText,
                   { color: isCompleted ? colors.accent : colors.text.tertiary }
                 ]}
               >
@@ -348,7 +478,7 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
       {/* Footer - Always at bottom */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 20 }]}>
-        <Button 
+        <Button
           title={currentButtonTitle}
           onPress={handleButtonPress}
           fullWidth
@@ -483,6 +613,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.secondary,
     textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+  },
+  subHeader: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.accent,
+    marginTop: 12,
+    marginBottom: 12,
+    fontFamily: 'Inter_700Bold',
+  },
+  boxContainer: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 24,
+    overflow: 'hidden',
+  },
+  boxHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  boxTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: 'Inter_700Bold',
+    marginLeft: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  boxText: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: colors.text.secondary,
     fontFamily: 'Inter_400Regular',
   },
 });

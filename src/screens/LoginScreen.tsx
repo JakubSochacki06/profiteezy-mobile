@@ -44,9 +44,15 @@ interface Bubble {
 // Configure Google Sign-In - you need to get the webClientId from Google Cloud Console
 // Go to https://console.cloud.google.com/apis/credentials and create an OAuth 2.0 Client ID
 // For Expo/React Native, you need a Web application type client ID
+const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
 GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
-  offlineAccess: true,
+  // webClientId is REQUIRED for getting the idToken needed for Supabase auth
+  webClientId: googleWebClientId,
+  // Only enable offlineAccess if webClientId is provided (it requires server auth)
+  offlineAccess: false,
+  // Request scopes for user profile info
+  scopes: ['profile', 'email'],
 });
 
 export const LoginScreen = () => {

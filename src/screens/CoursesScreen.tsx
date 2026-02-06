@@ -186,10 +186,18 @@ export const CoursesScreen = () => {
         activeOpacity={0.8}
       >
         <View style={styles.cardContent}>
-          <View style={[styles.imageContainer, { backgroundColor: `${iconColor}20` }]}>
-            <Text style={[styles.iconText, { color: iconColor }]}>
-              {item.title.charAt(0)}
-            </Text>
+          <View style={[styles.imageContainer, !item.image_url && { backgroundColor: `${iconColor}20` }]}>
+            {item.image_url ? (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.courseImage}
+                resizeMode="contain"
+              />
+            ) : (
+              <Text style={[styles.iconText, { color: iconColor }]}>
+                {item.title.charAt(0)}
+              </Text>
+            )}
           </View>
           <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
           <Text style={styles.cardSubtitle}>
@@ -312,6 +320,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     borderRadius: 12,
+    overflow: 'hidden',
+  },
+  courseImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: undefined,
+    height: undefined,
   },
   iconText: {
     fontSize: 36,
