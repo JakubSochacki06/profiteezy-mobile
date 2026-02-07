@@ -18,7 +18,7 @@ export const FreeTextTask: React.FC<Props> = ({ task, onComplete, registerContro
 
   const handleSubmit = () => {
     if (!isValid) return;
-    
+
     if (!hasSubmitted) {
       setHasSubmitted(true);
     } else {
@@ -34,7 +34,7 @@ export const FreeTextTask: React.FC<Props> = ({ task, onComplete, registerContro
   }, [text, hasSubmitted, isValid]);
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={{ flex: 1 }}
       keyboardVerticalOffset={100}
@@ -42,7 +42,7 @@ export const FreeTextTask: React.FC<Props> = ({ task, onComplete, registerContro
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.question}>{task.question}</Text>
         <Text style={styles.prompt}>{task.prompt}</Text>
-        
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -56,7 +56,7 @@ export const FreeTextTask: React.FC<Props> = ({ task, onComplete, registerContro
           />
           {task.minChars && (
             <Text style={[
-              styles.counter, 
+              styles.counter,
               text.length < minChars ? { color: colors.text.tertiary } : { color: colors.success }
             ]}>
               {text.length} / {minChars} chars

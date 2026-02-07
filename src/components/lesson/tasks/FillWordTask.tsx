@@ -30,12 +30,12 @@ export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerContro
       const newFilled = [...filledWords];
       newFilled[firstEmptyIndex] = word;
       setFilledWords(newFilled);
-      
+
       const wordIndex = availableWords.indexOf(word);
       if (wordIndex > -1) {
-         const newAvailable = [...availableWords];
-         newAvailable.splice(wordIndex, 1);
-         setAvailableWords(newAvailable);
+        const newAvailable = [...availableWords];
+        newAvailable.splice(wordIndex, 1);
+        setAvailableWords(newAvailable);
       }
     }
   };
@@ -69,7 +69,7 @@ export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerContro
 
   const renderSentence = () => {
     let blankIndex = 0;
-    
+
     return (
       <View style={styles.sentenceContainer}>
         {segments.map((segment, index) => {
@@ -77,20 +77,20 @@ export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerContro
             const currentBlankIndex = blankIndex;
             const filledWord = filledWords[currentBlankIndex];
             blankIndex++;
-            
+
             let borderColor = colors.border;
             let textColor = colors.accent;
-            
+
             if (hasSubmitted) {
               if (filledWord === correctWords[currentBlankIndex]) {
-                 borderColor = colors.success;
-                 textColor = colors.success;
+                borderColor = colors.success;
+                textColor = colors.success;
               } else {
-                 borderColor = colors.error;
-                 textColor = colors.error;
+                borderColor = colors.error;
+                textColor = colors.error;
               }
             } else if (filledWord) {
-               borderColor = colors.accent;
+              borderColor = colors.accent;
             }
 
             return (
@@ -126,7 +126,7 @@ export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerContro
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <Text style={styles.question}>{task.question}</Text>
-      
+
       {renderSentence()}
 
       {/* Word Pool */}

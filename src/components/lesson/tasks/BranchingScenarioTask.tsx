@@ -52,42 +52,42 @@ export const BranchingScenarioTask: React.FC<Props> = ({ task, onComplete, regis
       }
     } else {
       // During scenario, hide the main button (user uses choices instead)
-      registerControls(false, "", () => {});
+      registerControls(false, "", () => { });
     }
   }, [isFinished, result]);
 
   if (!currentScenario && !isFinished) {
-    return <Text style={{color: 'white'}}>Error: Scenario not found</Text>;
+    return <Text style={{ color: 'white' }}>Error: Scenario not found</Text>;
   }
 
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <Text style={styles.headerTitle}>{task.question}</Text>
-      
+
       {isFinished ? (
         <View style={styles.resultContainer}>
           <Text style={[styles.resultTitle, { color: result === 'win' ? colors.success : colors.error }]}>
             {result === 'win' ? "Success!" : "Try Again"}
           </Text>
           <Text style={styles.resultText}>
-            {result === 'win' 
-              ? "You successfully navigated the scenario." 
+            {result === 'win'
+              ? "You successfully navigated the scenario."
               : "That choice didn't work out."}
           </Text>
         </View>
       ) : (
         <>
           {currentScenario.backgroundImage && (
-            <Image 
-              source={currentScenario.backgroundImage} 
+            <Image
+              source={currentScenario.backgroundImage}
               style={styles.scenarioImage}
               resizeMode="cover"
             />
           )}
-          
+
           <View style={styles.scenarioCard}>
             <Text style={styles.scenarioText}>{currentScenario.text}</Text>
-            
+
             <View style={styles.choicesContainer}>
               {currentScenario.choices.map((choice, index) => (
                 <TouchableOpacity

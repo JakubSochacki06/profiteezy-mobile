@@ -28,7 +28,7 @@ export const SortTask: React.FC<Props> = ({ task, onComplete, registerControls }
 
   const handleSortIntoCategory = (categoryId: string) => {
     if (!selectedItem) return;
-    
+
     const item = unsortedItems.find(i => i.id === selectedItem);
     if (!item) return;
 
@@ -100,28 +100,28 @@ export const SortTask: React.FC<Props> = ({ task, onComplete, registerControls }
             <Text style={styles.categoryTitle}>{category.name}</Text>
             <View style={styles.categoryItems}>
               {(sortedItems[category.id] || []).map(item => {
-                 let itemColor = colors.surface;
-                 if (hasSubmitted) {
-                    itemColor = item.categoryId === category.id ? colors.success : colors.error;
-                 }
-                 
-                 return (
-                  <TouchableOpacity 
-                    key={item.id} 
+                let itemColor = colors.surface;
+                if (hasSubmitted) {
+                  itemColor = item.categoryId === category.id ? colors.success : colors.error;
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={item.id}
                     style={[styles.sortedItem, { backgroundColor: itemColor === colors.surface ? 'rgba(255,255,255,0.1)' : itemColor }]}
                     onPress={() => handleReturnToPool(category.id, item.id)}
                   >
                     <Text style={styles.sortedItemText}>{item.content}</Text>
                     {hasSubmitted && (
-                       <Ionicons 
-                         name={item.categoryId === category.id ? "checkmark" : "alert-circle"} 
-                         size={14} 
-                         color="white" 
-                         style={{marginLeft: 4}}
-                       />
+                      <Ionicons
+                        name={item.categoryId === category.id ? "checkmark" : "alert-circle"}
+                        size={14}
+                        color="white"
+                        style={{ marginLeft: 4 }}
+                      />
                     )}
                   </TouchableOpacity>
-                 );
+                );
               })}
             </View>
           </TouchableOpacity>

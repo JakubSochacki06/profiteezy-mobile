@@ -59,21 +59,21 @@ export const DragDropTask: React.FC<Props> = ({ task, onComplete, registerContro
         {correctOrder.map((_, index) => {
           const item = orderedItems[index];
           const isFilled = !!item;
-          
+
           let borderColor = colors.border;
           if (hasSubmitted) {
-             if (item === correctOrder[index]) {
-               borderColor = colors.success;
-             } else {
-               borderColor = colors.error;
-             }
+            if (item === correctOrder[index]) {
+              borderColor = colors.success;
+            } else {
+              borderColor = colors.error;
+            }
           }
 
           return (
-            <TouchableOpacity 
-              key={index} 
+            <TouchableOpacity
+              key={index}
               style={[
-                styles.slot, 
+                styles.slot,
                 isFilled && styles.slotFilled,
                 { borderColor }
               ]}

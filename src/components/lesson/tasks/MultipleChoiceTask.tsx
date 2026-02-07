@@ -15,7 +15,7 @@ export const MultipleChoiceTask: React.FC<Props> = ({ task, onComplete, register
 
   const handleSubmit = () => {
     if (selectedOption === null) return;
-    
+
     if (!hasSubmitted) {
       setHasSubmitted(true);
     } else {
@@ -35,24 +35,24 @@ export const MultipleChoiceTask: React.FC<Props> = ({ task, onComplete, register
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <Text style={styles.question}>{task.question}</Text>
-      
+
       <View style={styles.optionsContainer}>
         {(task.options || []).map((option, index) => {
           const isSelected = selectedOption === index;
           let borderColor = colors.border;
           let backgroundColor = colors.surface;
-          
+
           if (hasSubmitted) {
-             if (index === task.correctIndex) {
-                borderColor = colors.success;
-                backgroundColor = 'rgba(76, 175, 80, 0.1)';
-             } else if (isSelected) {
-                borderColor = colors.error;
-                backgroundColor = 'rgba(244, 67, 54, 0.1)';
-             }
+            if (index === task.correctIndex) {
+              borderColor = colors.success;
+              backgroundColor = 'rgba(76, 175, 80, 0.1)';
+            } else if (isSelected) {
+              borderColor = colors.error;
+              backgroundColor = 'rgba(244, 67, 54, 0.1)';
+            }
           } else if (isSelected) {
-             borderColor = colors.accent;
-             backgroundColor = 'rgba(95, 203, 15, 0.1)';
+            borderColor = colors.accent;
+            backgroundColor = 'rgba(95, 203, 15, 0.1)';
           }
 
           return (
@@ -73,9 +73,9 @@ export const MultipleChoiceTask: React.FC<Props> = ({ task, onComplete, register
                 hasSubmitted && isSelected && index !== task.correctIndex && { borderColor: colors.error },
               ]}>
                 {isSelected && <View style={[
-                    styles.radioInner,
-                     hasSubmitted && index === task.correctIndex && { backgroundColor: colors.success },
-                     hasSubmitted && isSelected && index !== task.correctIndex && { backgroundColor: colors.error },
+                  styles.radioInner,
+                  hasSubmitted && index === task.correctIndex && { backgroundColor: colors.success },
+                  hasSubmitted && isSelected && index !== task.correctIndex && { backgroundColor: colors.error },
                 ]} />}
               </View>
               <Text style={[
