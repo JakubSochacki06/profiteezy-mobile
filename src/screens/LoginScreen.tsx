@@ -49,10 +49,6 @@ const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 GoogleSignin.configure({
   // webClientId is REQUIRED for getting the idToken needed for Supabase auth
   webClientId: googleWebClientId,
-  // Only enable offlineAccess if webClientId is provided (it requires server auth)
-  offlineAccess: false,
-  // Request scopes for user profile info
-  scopes: ['profile', 'email'],
 });
 
 export const LoginScreen = () => {
@@ -69,7 +65,7 @@ export const LoginScreen = () => {
   const [showHome, setShowHome] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
-  
+
   // Animation values
   const slideAnim = useRef(new Animated.Value(height)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -79,7 +75,7 @@ export const LoginScreen = () => {
       // Animate In
       slideAnim.setValue(height);
       fadeAnim.setValue(0);
-      
+
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
@@ -144,33 +140,33 @@ export const LoginScreen = () => {
   const handleGoogleSignIn = async () => {
     try {
       setIsGoogleSigningIn(true);
-      
+
       // Check if device supports Google Play Services
       await GoogleSignin.hasPlayServices();
-      
+
       // Perform the Google Sign-In
       const response = await GoogleSignin.signIn();
-      
+
       if (isSuccessResponse(response)) {
         // Get the ID token from the response
         const idToken = response.data.idToken;
-        
+
         if (!idToken) {
           throw new Error('No ID token returned from Google Sign-In');
         }
-        
+
         // Sign in with Supabase using the ID token
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: idToken,
         });
-        
+
         if (error) {
           console.error('Supabase auth error:', error);
           Alert.alert('Sign In Error', error.message);
           return;
         }
-        
+
         if (data.session) {
           console.log('Successfully signed in with Google!', data.user?.email);
           // Close the modal and navigate to home
@@ -179,26 +175,27 @@ export const LoginScreen = () => {
         }
       }
     } catch (error: any) {
+      console.error('Google Sign-In FULL error:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error('Error code:', error?.code);
+      console.error('Error message:', error?.message);
+      console.error('Error stack:', error?.stack);
+
       if (isErrorWithCode(error)) {
         switch (error.code) {
           case statusCodes.IN_PROGRESS:
-            // Sign-in is already in progress
             console.log('Sign-in already in progress');
             break;
           case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
             Alert.alert('Error', 'Google Play Services is not available on this device');
             break;
           case statusCodes.SIGN_IN_CANCELLED:
-            // User cancelled the sign-in flow
             console.log('User cancelled sign-in');
             break;
           default:
-            console.error('Google Sign-In error:', error);
-            Alert.alert('Sign In Error', 'An error occurred during Google Sign-In');
+            Alert.alert('Sign In Error', `Code: ${error.code}\n\n${error.message || 'Unknown error'}\n\nwebClientId: ${googleWebClientId ? googleWebClientId.substring(0, 20) + '...' : 'NOT SET'}`);
         }
       } else {
-        console.error('Unknown error:', error);
-        Alert.alert('Sign In Error', error.message || 'An unexpected error occurred');
+        Alert.alert('Sign In Error', `${error.message || 'An unexpected error occurred'}\n\nFull: ${JSON.stringify(error, Object.getOwnPropertyNames(error))}`);
       }
     } finally {
       setIsGoogleSigningIn(false);
@@ -219,7 +216,7 @@ export const LoginScreen = () => {
         (angle > -Math.PI / 4 && angle < Math.PI / 4) || // Right side
         (angle > (3 * Math.PI) / 4 && angle < (5 * Math.PI) / 4) // Left side
       );
-      
+
       // Randomly choose which circle (outer or inner)
       const circleRadius = Math.random() > 0.5 ? (width * 1.1) / 2 : (width * 0.7) / 2;
       const radius = circleRadius;
@@ -268,7 +265,7 @@ export const LoginScreen = () => {
     const initialTimeout = setTimeout(() => {
       createBubble();
     }, 1000);
-    
+
     // Create bubbles periodically
     const periodicInterval = setInterval(createBubble, 3000);
 
@@ -313,10 +310,10 @@ export const LoginScreen = () => {
         {/* Header with App Name Placeholder */}
         <View style={styles.header}>
           <View style={styles.logoPlaceholder}>
-            <Text style={styles.logoText}>Profiteezy</Text>
+            <Text style={styles.logoText}>Hustlingo</Text>
           </View>
           {/* Sneaky Debug Button - Remove in production */}
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => setShowHome(true)}
             style={styles.debugButton}
             activeOpacity={0.7}
@@ -331,7 +328,7 @@ export const LoginScreen = () => {
             {/* Outer circles */}
             <View style={[styles.circle, styles.circle1]} />
             <View style={[styles.circle, styles.circle2]} />
-            
+
             {/* Money bubbles */}
             {bubbles.map((bubble) => {
               const position = getBubblePosition(bubble);
@@ -348,19 +345,19 @@ export const LoginScreen = () => {
                     },
                   ]}
                 >
-                  <Image 
-                    source={require('../../assets/money-icon.png')} 
+                  <Image
+                    source={require('../../assets/money-icon.png')}
                     style={styles.bubbleImage}
                     resizeMode="contain"
                   />
                 </Animated.View>
               );
             })}
-            
+
             {/* Center circle with laptop image */}
             <View style={styles.centerCircle}>
-              <Image 
-                source={require('../../assets/laptop-icon.png')} 
+              <Image
+                source={require('../../assets/laptop-icon.png')}
                 style={styles.centerImage}
                 resizeMode="contain"
               />
@@ -381,7 +378,7 @@ export const LoginScreen = () => {
         <View style={[styles.bottomContainer, { paddingBottom: 28 + insets.bottom }]}>
           <View style={styles.bottomContent}>
             {/* Get Started Button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.getStartedButton}
               onPress={handleGetStarted}
               activeOpacity={0.9}
@@ -390,7 +387,7 @@ export const LoginScreen = () => {
             </TouchableOpacity>
 
             {/* Sign In Link */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleSignIn}
               activeOpacity={0.7}
             >
@@ -408,7 +405,7 @@ export const LoginScreen = () => {
         onRequestClose={handleCloseModal}
       >
         <TouchableWithoutFeedback onPress={handleCloseModal}>
-          <Animated.View 
+          <Animated.View
             style={[
               styles.modalOverlay,
               {
@@ -420,10 +417,10 @@ export const LoginScreen = () => {
             ]}
           >
             <TouchableWithoutFeedback>
-              <Animated.View 
+              <Animated.View
                 style={[
-                  styles.modalContent, 
-                  { 
+                  styles.modalContent,
+                  {
                     paddingBottom: insets.bottom + 20,
                     transform: [{ translateY: slideAnim }]
                   }
@@ -432,8 +429,8 @@ export const LoginScreen = () => {
                 {/* Header */}
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>Sign in</Text>
-                  <TouchableOpacity 
-                    style={styles.closeButton} 
+                  <TouchableOpacity
+                    style={styles.closeButton}
                     onPress={handleCloseModal}
                   >
                     <Ionicons name="close" size={24} color={colors.text.secondary} />
@@ -442,7 +439,7 @@ export const LoginScreen = () => {
 
                 {/* Sign In Options */}
                 <View style={styles.modalBody}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={[styles.authButton, isGoogleSigningIn && styles.authButtonDisabled]}
                     onPress={handleGoogleSignIn}
                     disabled={isGoogleSigningIn}
@@ -451,8 +448,8 @@ export const LoginScreen = () => {
                     {isGoogleSigningIn ? (
                       <ActivityIndicator size="small" color={colors.text.primary} style={styles.authIcon} />
                     ) : (
-                      <Image 
-                        source={require('../../assets/logos/googleLogo.png')} 
+                      <Image
+                        source={require('../../assets/logos/googleLogo.png')}
                         style={styles.googleLogo}
                         resizeMode="contain"
                       />
@@ -471,7 +468,7 @@ export const LoginScreen = () => {
                 {/* Footer */}
                 <View style={styles.modalFooter}>
                   <Text style={styles.footerText}>
-                    By continuing, you agree to Profiteezy's{' '}
+                    By continuing, you agree to Hustlingo's{' '}
                     <Text style={styles.footerLink}>Terms and Conditions</Text> and{' '}
                     <Text style={styles.footerLink}>Privacy Policy</Text>
                   </Text>

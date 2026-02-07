@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Profiteezy",
-    "slug": "profiteezy-mobile",
+    "name": "Hustlingo",
+    "slug": "hustlingo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,15 +14,15 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.profiteezy.app"
+      "bundleIdentifier": "com.hustlingo.app"
     },
-    "scheme": "profiteezy",
+    "scheme": "hustlingo",
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.profiteezy.app",
+      "package": "com.hustlingo.app",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -34,6 +34,12 @@
     ],
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "ff454c2e-b48a-426d-97af-042195baf61e"
+      }
+    },
+    "owner": "sohatzky"
   }
 }

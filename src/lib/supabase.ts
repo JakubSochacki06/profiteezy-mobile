@@ -5,13 +5,13 @@ import { AppState, Platform } from 'react-native';
 // These come from .env file (EXPO_PUBLIC_ prefix makes them available in Expo)
 // Get your credentials from: https://supabase.com/dashboard/project/_/settings/api
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('⚠️ Missing Supabase credentials! Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in your .env file');
+if (!supabaseUrl || !supabaseKey) {
+  console.error('⚠️ Missing Supabase credentials! Please set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_KEY in your .env file');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(supabaseUrl, supabaseKey, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,

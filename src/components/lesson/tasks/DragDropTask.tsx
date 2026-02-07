@@ -10,12 +10,14 @@ interface Props {
 }
 
 export const DragDropTask: React.FC<Props> = ({ task, onComplete, registerControls }) => {
+  const items = task.items || [];
+  const correctOrder = task.correctOrder || [];
   const [availableItems, setAvailableItems] = useState<string[]>([]);
   const [orderedItems, setOrderedItems] = useState<string[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   useEffect(() => {
-    setAvailableItems([...task.items]);
+    setAvailableItems([...items]);
     setOrderedItems([]);
     setHasSubmitted(false);
   }, [task]);
@@ -34,18 +36,18 @@ export const DragDropTask: React.FC<Props> = ({ task, onComplete, registerContro
     if (!hasSubmitted) {
       setHasSubmitted(true);
     } else {
-      const correct = orderedItems.every((item, index) => item === task.correctOrder[index]) && orderedItems.length === task.correctOrder.length;
+      const correct = orderedItems.every((item, index) => item === correctOrder[index]) && orderedItems.length === correctOrder.length;
       onComplete(correct);
     }
   };
 
   // Register controls with parent
   useEffect(() => {
-    const isComplete = orderedItems.length === task.correctOrder.length;
+    const isComplete = orderedItems.length === correctOrder.length;
     const canSubmit = hasSubmitted || isComplete;
     const title = hasSubmitted ? "Continue" : "Check Order";
     registerControls(canSubmit, title, handleSubmit);
-  }, [orderedItems, hasSubmitted, task.correctOrder.length]);
+  }, [orderedItems, hasSubmitted, correctOrder.length]);
 
   return (
     <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
@@ -54,13 +56,13 @@ export const DragDropTask: React.FC<Props> = ({ task, onComplete, registerContro
 
       {/* Slots for Ordered Items */}
       <View style={styles.slotsContainer}>
-        {task.correctOrder.map((_, index) => {
+        {correctOrder.map((_, index) => {
           const item = orderedItems[index];
           const isFilled = !!item;
           
           let borderColor = colors.border;
           if (hasSubmitted) {
-             if (item === task.correctOrder[index]) {
+             if (item === correctOrder[index]) {
                borderColor = colors.success;
              } else {
                borderColor = colors.error;

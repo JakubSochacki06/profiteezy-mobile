@@ -37,7 +37,7 @@ export const MultipleChoiceTask: React.FC<Props> = ({ task, onComplete, register
       <Text style={styles.question}>{task.question}</Text>
       
       <View style={styles.optionsContainer}>
-        {task.options.map((option, index) => {
+        {(task.options || []).map((option, index) => {
           const isSelected = selectedOption === index;
           let borderColor = colors.border;
           let backgroundColor = colors.surface;

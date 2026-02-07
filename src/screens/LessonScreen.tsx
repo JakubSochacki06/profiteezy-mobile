@@ -107,28 +107,105 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
       // Transform tasks data - map database format to component format
       const transformedTasks: Task[] = (tasksData || []).map((task: any) => {
-        // Map database task type to our component types
         const taskType = task.type || 'multiple_choice';
         const data = task.data || {};
+        console.log(`Task [${taskType}]:`, JSON.stringify(data));
 
-        // Handle multiple_choice tasks
-        if (taskType === 'multiple_choice') {
-          return {
-            id: task.id,
-            type: 'multiple_choice',
-            question: task.prompt || '',
-            options: data.choices || [],
-            correctIndex: data.correct_answer ?? 0,
-          } as Task;
+        switch (taskType) {
+          case 'multiple_choice':
+            return {
+              id: task.id,
+              type: 'multiple_choice',
+              question: task.prompt || '',
+              options: data.choices || data.options || [],
+              correctIndex: data.correct_answer ?? data.correctIndex ?? 0,
+            } as Task;
+          case 'drag_drop':
+            return {
+              id: task.id,
+              type: 'drag_drop',
+              question: task.prompt || '',
+              items: data.items || [],
+              correctOrder: data.correct_order || data.correctOrder || [],
+            } as Task;
+          case 'sort': {
+            // DB format: categories is an object { "CategoryName": { items: [...] } }
+            // Component expects: categories as [{ id, name }], items as [{ id, content, categoryId }]
+            const dbCategories = data.categories || {};
+            const sortCategories = Object.keys(dbCategories).map(name => ({
+              id: name,
+              name,
+            }));
+            // Build item-to-category mapping from the categories object
+            const categoryItemMap: Record<string, string> = {};
+            Object.entries(dbCategories).forEach(([catName, catData]: [string, any]) => {
+              (catData?.items || []).forEach((item: string) => {
+                categoryItemMap[item] = catName;
+              });
+            });
+            const sortItems = (data.items || []).map((item: string, i: number) => ({
+              id: `item-${i}`,
+              content: item,
+              categoryId: categoryItemMap[item] || '',
+            }));
+            return {
+              id: task.id,
+              type: 'sort',
+              question: task.prompt || '',
+              categories: sortCategories,
+              items: sortItems,
+            } as Task;
+          }
+          case 'fill_word': {
+            // DB format: sentences is string[] with "___" as blanks, answers is string[]
+            // Component expects: segments as (string | null)[] where null = blank
+            const dbSentences: string[] = data.sentences || [];
+            const fillSegments: (string | null)[] = [];
+            if (dbSentences.length > 0) {
+              dbSentences.forEach((sentence: string, i: number) => {
+                if (i > 0) fillSegments.push('\n\n');
+                const parts = sentence.split('___');
+                parts.forEach((part: string, j: number) => {
+                  if (part) fillSegments.push(part);
+                  if (j < parts.length - 1) fillSegments.push(null);
+                });
+              });
+            }
+            return {
+              id: task.id,
+              type: 'fill_word',
+              question: task.prompt || '',
+              sentence: dbSentences.join(' ') || data.sentence || '',
+              segments: fillSegments.length > 0 ? fillSegments : data.segments || [],
+              words: data.words || [],
+              correctWords: data.answers || data.correct_words || data.correctWords || [],
+            } as Task;
+          }
+          case 'free_text':
+            return {
+              id: task.id,
+              type: 'free_text',
+              question: task.prompt || '',
+              prompt: data.prompt || task.prompt || '',
+              placeholder: data.placeholder,
+              minChars: data.min_chars || data.minChars,
+            } as Task;
+          case 'branching_scenario':
+            return {
+              id: task.id,
+              type: 'branching_scenario',
+              question: task.prompt || '',
+              startScenarioId: data.start_scenario_id || data.startScenarioId || '',
+              scenarios: data.scenarios || {},
+            } as Task;
+          default:
+            return {
+              id: task.id,
+              type: taskType,
+              question: task.prompt || '',
+              ...data,
+            } as Task;
         }
-
-        // Handle other task types
-        return {
-          id: task.id,
-          type: taskType,
-          question: task.prompt || '',
-          ...data,
-        } as Task;
       });
 
       console.log('=== TRANSFORMED DATA ===');

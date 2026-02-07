@@ -15,7 +15,8 @@ export const BranchingScenarioTask: React.FC<Props> = ({ task, onComplete, regis
   const [isFinished, setIsFinished] = useState(false);
   const [result, setResult] = useState<'win' | 'lose' | null>(null);
 
-  const currentScenario = task.scenarios[currentScenarioId];
+  const scenarios = task.scenarios || {};
+  const currentScenario = scenarios[currentScenarioId];
 
   const handleChoice = (nextId: string | 'win' | 'lose') => {
     if (nextId === 'win') {

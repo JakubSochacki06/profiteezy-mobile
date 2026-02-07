@@ -11,8 +11,10 @@ interface Props {
 }
 
 export const SortTask: React.FC<Props> = ({ task, onComplete, registerControls }) => {
-  const [unsortedItems, setUnsortedItems] = useState(task.items);
-  const [sortedItems, setSortedItems] = useState<Record<string, typeof task.items>>({});
+  const categories = task.categories || [];
+  const items = task.items || [];
+  const [unsortedItems, setUnsortedItems] = useState(items);
+  const [sortedItems, setSortedItems] = useState<Record<string, typeof items>>({});
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
@@ -85,7 +87,7 @@ export const SortTask: React.FC<Props> = ({ task, onComplete, registerControls }
 
       {/* Categories Buckets */}
       <View style={styles.categoriesContainer}>
-        {task.categories.map(category => (
+        {categories.map(category => (
           <TouchableOpacity
             key={category.id}
             style={[

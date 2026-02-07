@@ -232,7 +232,7 @@ export const PersonalPlanScreen: React.FC<Props> = ({
                 <View style={styles.divider} />
                 <View style={styles.reviewsHeader}>
                   <Text style={styles.reviewsCount}>100k+ people</Text>
-                  <Text style={styles.reviewsSubtext}>have chosen Profiteezy</Text>
+                  <Text style={styles.reviewsSubtext}>have chosen Hustlingo</Text>
                 </View>
                 
                 <View style={styles.reviewContainer}>

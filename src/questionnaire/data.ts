@@ -275,7 +275,7 @@ export const questionnaireData: QuestionnaireData = {
         image: require('../../assets/questionnaire/handshake3.png'),
         title: "Thank you for trusting us!",
         titlePosition: 'bottom',
-        description: "Now let's make your dreams come true with Profiteezy" 
+        description: "Now let's make your dreams come true with Hustlingo" 
       },
       {
         type: 'input' as const,

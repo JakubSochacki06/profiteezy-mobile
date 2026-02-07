@@ -1,4 +1,4 @@
-# Profiteezy Mobile
+# Hustlingo Mobile
 
 A mobile duolingo like learning platform for making money online (side hustles). Built with React Native, Expo, and Supabase.
 
@@ -109,4 +109,4 @@ npx expo run:ios        # Run on iOS
 - Supabase queries done inline in screens with loading/error states
 - Platform-specific adjustments via `Platform.OS` checks
 - Safe area handled with `react-native-safe-area-context`
-- Bundle ID: `com.profiteezy.app`
+- Bundle ID: `com.hustlingo.app`

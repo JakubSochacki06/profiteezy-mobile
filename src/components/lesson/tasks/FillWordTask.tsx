@@ -10,13 +10,16 @@ interface Props {
 }
 
 export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerControls }) => {
+  const segments = task.segments || [];
+  const words = task.words || [];
+  const correctWords = task.correctWords || [];
   const [availableWords, setAvailableWords] = useState<string[]>([]);
   const [filledWords, setFilledWords] = useState<(string | null)[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   useEffect(() => {
-    setAvailableWords([...task.words]);
-    const blankCount = task.segments.filter(s => s === null).length;
+    setAvailableWords([...words]);
+    const blankCount = segments.filter(s => s === null).length;
     setFilledWords(Array(blankCount).fill(null));
     setHasSubmitted(false);
   }, [task]);
@@ -51,7 +54,7 @@ export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerContro
     if (!hasSubmitted) {
       setHasSubmitted(true);
     } else {
-      const correct = filledWords.every((word, index) => word === task.correctWords[index]);
+      const correct = filledWords.every((word, index) => word === correctWords[index]);
       onComplete(correct);
     }
   };
@@ -69,7 +72,7 @@ export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerContro
     
     return (
       <View style={styles.sentenceContainer}>
-        {task.segments.map((segment, index) => {
+        {segments.map((segment, index) => {
           if (segment === null) {
             const currentBlankIndex = blankIndex;
             const filledWord = filledWords[currentBlankIndex];
@@ -79,7 +82,7 @@ export const FillWordTask: React.FC<Props> = ({ task, onComplete, registerContro
             let textColor = colors.accent;
             
             if (hasSubmitted) {
-              if (filledWord === task.correctWords[currentBlankIndex]) {
+              if (filledWord === correctWords[currentBlankIndex]) {
                  borderColor = colors.success;
                  textColor = colors.success;
               } else {

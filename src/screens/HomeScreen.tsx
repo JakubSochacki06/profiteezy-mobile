@@ -39,7 +39,7 @@ export const HomeScreen = () => {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>Profiteezy</Text>
+              <Text style={styles.logoText}>Hustlingo</Text>
             </View>
             <View style={styles.streakBadge}>
               <Ionicons name="flash" size={16} color={colors.text.secondary} />
