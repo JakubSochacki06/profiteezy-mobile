@@ -62,6 +62,7 @@ export const LoginScreen = () => {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const bubbleIdRef = useRef(0);
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
+  const [questionnaireStartIndex, setQuestionnaireStartIndex] = useState<number | undefined>(undefined);
   const [showHome, setShowHome] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
@@ -125,6 +126,12 @@ export const LoginScreen = () => {
   });
 
   const handleGetStarted = () => {
+    setQuestionnaireStartIndex(undefined);
+    setShowQuestionnaire(true);
+  };
+
+  const handleDevSkipToEnd = () => {
+    setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
     setShowQuestionnaire(true);
   };
 
@@ -290,6 +297,7 @@ export const LoginScreen = () => {
       <QuestionnaireNavigator
         data={questionnaireData}
         onComplete={handleQuestionnaireComplete}
+        startIndex={questionnaireStartIndex}
       />
     );
   }
@@ -312,13 +320,20 @@ export const LoginScreen = () => {
           <View style={styles.logoPlaceholder}>
             <Text style={styles.logoText}>Hustlingo</Text>
           </View>
-          {/* Sneaky Debug Button - Remove in production */}
+          {/* Sneaky Debug Buttons - Remove in production */}
           <TouchableOpacity
             onPress={() => setShowHome(true)}
             style={styles.debugButton}
             activeOpacity={0.7}
           >
             <Text style={styles.debugButtonText}>🏠</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDevSkipToEnd}
+            style={styles.debugButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.debugButtonText}>⏭️</Text>
           </TouchableOpacity>
         </View>
 

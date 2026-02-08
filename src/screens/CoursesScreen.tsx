@@ -22,11 +22,13 @@ import { supabase, Course as SupabaseCourse } from '../lib/supabase';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 50) / 2;
 
 // Local course type with progress
 interface Course extends SupabaseCourse {
   progress: number;
+  lesson_count: number;
+  stage_count: number;
+  image_url?: string | null;
 }
 
 // Fallback image for courses without an image_url
@@ -54,7 +56,7 @@ export const CoursesScreen = () => {
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
-  
+
   // Data fetching state
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,7 +157,7 @@ export const CoursesScreen = () => {
 
   if (activeLessonId) {
     return (
-      <LessonScreen 
+      <LessonScreen
         lessonId={activeLessonId}
         onClose={() => setActiveLessonId(null)}
         onComplete={() => {
@@ -168,44 +170,57 @@ export const CoursesScreen = () => {
 
   if (selectedCourse) {
     return (
-      <CoursePathScreen 
-        course={selectedCourse} 
-        onBack={() => setSelectedCourse(null)} 
+      <CoursePathScreen
+        course={selectedCourse}
+        onBack={() => setSelectedCourse(null)}
         onStartLesson={(lessonId) => setActiveLessonId(lessonId)}
       />
     );
   }
 
   const renderItem = ({ item }: { item: Course }) => {
-    const iconColor = item.icon ? (ICON_COLORS[item.icon] || colors.accent) : colors.accent;
-    
-    return (
-      <TouchableOpacity 
-        style={styles.card} 
-        onPress={() => setSelectedCourse(item)}
-        activeOpacity={0.8}
-      >
-        <View style={styles.cardContent}>
-          <View style={[styles.imageContainer, !item.image_url && { backgroundColor: `${iconColor}20` }]}>
-            {item.image_url ? (
-              <Image
-                source={{ uri: item.image_url }}
-                style={styles.courseImage}
-                resizeMode="contain"
-              />
-            ) : (
-              <Text style={[styles.iconText, { color: iconColor }]}>
-                {item.title.charAt(0)}
-              </Text>
-            )}
-          </View>
-          <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.cardSubtitle}>
-            {item.lesson_count || 0} lessons • {item.difficulty || 'Beginner'}
+    // Determine color based on icon or default to accent
+    // If no icon is provided, we can fallback to the app theme accent or a cycled color
+    const themeColor = item.icon ? (ICON_COLORS[item.icon] || colors.accent) : colors.accent;
+
+    // For the icon display
+    const IconComponent = () => (
+      item.image_url ? (
+        <Image
+          source={{ uri: item.image_url }}
+          style={styles.courseImage}
+          resizeMode="contain"
+        />
+      ) : (
+        <View style={[styles.iconPlaceholder, { backgroundColor: `${themeColor}20` }]}>
+          <Text style={[styles.iconText, { color: themeColor }]}>
+            {item.title.charAt(0)}
           </Text>
-          <View style={styles.progressContainer}>
-            <View style={[styles.progressBar, { width: `${item.progress * 100}%` }]} />
+        </View>
+      )
+    );
+
+    return (
+      <TouchableOpacity
+        style={[styles.card, { borderColor: themeColor }]}
+        onPress={() => setSelectedCourse(item)}
+        activeOpacity={0.9}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.iconContainer}>
+            <IconComponent />
           </View>
+        </View>
+
+        <Text style={styles.cardTitle}>{item.title}</Text>
+
+        <View style={styles.progressSection}>
+          <Text style={styles.sectionText}>STAGES</Text>
+          <Text style={styles.progressText}>0/{item.stage_count || item.lesson_count || 20}</Text>
+        </View>
+
+        <View style={styles.progressBarContainer}>
+          <View style={[styles.progressBar, { width: `${item.progress * 100}%`, backgroundColor: themeColor }]} />
         </View>
       </TouchableOpacity>
     );
@@ -233,7 +248,7 @@ export const CoursesScreen = () => {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      
+
       {/* Header */}
       <View style={styles.header}>
         <IconButton
@@ -241,7 +256,7 @@ export const CoursesScreen = () => {
           onPress={() => navigation.navigate('Home' as never)}
           variant="filled"
         />
-        <Text style={styles.headerTitle}>Your Mastery path</Text>
+        <Text style={styles.headerTitle}>Career Paths</Text>
       </View>
 
       {loading ? (
@@ -256,12 +271,10 @@ export const CoursesScreen = () => {
           data={courses}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          numColumns={2}
           contentContainerStyle={[
             styles.listContainer,
             courses.length === 0 && styles.listContainerEmpty,
           ]}
-          columnWrapperStyle={courses.length > 0 ? styles.columnWrapper : undefined}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
           refreshing={loading}
@@ -283,82 +296,101 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     paddingTop: 10,
-    gap: 8,
+    gap: 12,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: colors.text.primary,
     fontFamily: 'Inter_700Bold',
   },
   listContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 40,
+    gap: 20,
   },
   listContainerEmpty: {
     flex: 1,
   },
-  columnWrapper: {
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
   card: {
-    width: CARD_WIDTH,
-    backgroundColor: colors.surface, 
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 2,
+    // Add subtle shadow/elevation
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
-  cardContent: {
-    alignItems: 'flex-start',
+  cardHeader: {
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
   },
-  imageContainer: {
-    width: '100%',
-    height: 80,
+  iconContainer: {
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    borderRadius: 12,
-    overflow: 'hidden',
+  },
+  iconPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   courseImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: undefined,
-    height: undefined,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
   },
   iconText: {
-    fontSize: 36,
+    fontSize: 20,
     fontWeight: 'bold',
     fontFamily: 'Inter_700Bold',
-  },
-  cardImage: {
-    width: 60,
-    height: 60,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: 'bold',
     color: colors.text.primary,
-    marginBottom: 4,
+    marginBottom: 16,
     fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.5,
   },
-  cardSubtitle: {
-    fontSize: 12,
+  progressSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionText: {
+    fontSize: 13,
     color: colors.text.secondary,
-    marginBottom: 12,
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
-  progressContainer: {
+  progressText: {
+    fontSize: 14,
+    color: colors.text.primary,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  progressBarContainer: {
     width: '100%',
-    height: 6,
-    backgroundColor: colors.background,
-    borderRadius: 3,
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 3,
+    borderRadius: 4,
   },
   loadingContainer: {
     flex: 1,

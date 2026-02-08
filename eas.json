@@ -1,0 +1,10 @@
+{
+    "build": {
+      "internal": {
+        "android": {
+          "buildType": "app-bundle"
+        }
+      }
+    }
+  }
+  

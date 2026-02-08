@@ -11,15 +11,17 @@ interface QuestionnaireNavigatorProps {
   data: QuestionnaireData;
   onComplete: (results: QuestionnaireResult) => void;
   onSkip?: () => void;
+  startIndex?: number;
 }
 
 export const QuestionnaireNavigator: React.FC<QuestionnaireNavigatorProps> = ({
   data,
   onComplete,
   onSkip,
+  startIndex,
 }) => {
   // -1 = welcome screen, 0+ = question index
-  const [currentIndex, setCurrentIndex] = useState(-1);
+  const [currentIndex, setCurrentIndex] = useState(startIndex ?? -1);
   const [answers, setAnswers] = useState<QuestionnaireResult>({});
 
   const totalSteps = data.questions.length;

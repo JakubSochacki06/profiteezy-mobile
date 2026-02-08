@@ -7,6 +7,7 @@ import {
   Image,
   Dimensions,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -477,22 +478,42 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
     const key = task.id;
 
+    let taskComponent: React.ReactNode;
     switch (task.type) {
       case 'multiple_choice':
-        return <MultipleChoiceTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        taskComponent = <MultipleChoiceTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        break;
       case 'drag_drop':
-        return <DragDropTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        taskComponent = <DragDropTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        break;
       case 'sort':
-        return <SortTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        taskComponent = <SortTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        break;
       case 'fill_word':
-        return <FillWordTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        taskComponent = <FillWordTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        break;
       case 'free_text':
-        return <FreeTextTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        taskComponent = <FreeTextTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        break;
       case 'branching_scenario':
-        return <BranchingScenarioTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        taskComponent = <BranchingScenarioTask key={key} task={task} onComplete={handleTaskComplete} registerControls={registerTaskControls} />;
+        break;
       default:
-        return <Text style={{ color: 'white' }}>Unknown Task Type: {(task as any).type}</Text>;
+        taskComponent = <Text style={{ color: 'white' }}>Unknown Task Type: {(task as any).type}</Text>;
     }
+
+    return (
+      <View style={{ flex: 1 }}>
+        {taskComponent}
+        <TouchableOpacity
+          style={styles.devSkipButton}
+          onPress={() => handleTaskComplete(true)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="play-skip-forward-outline" size={16} color={colors.text.tertiary} />
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   // Loading state
@@ -755,5 +776,11 @@ const styles = StyleSheet.create({
     width: width - 48,
     height: (width - 48) * 0.6,
     borderRadius: 12,
+  },
+  devSkipButton: {
+    position: 'absolute',
+    bottom: 8,
+    right: 24,
+    opacity: 0.4,
   },
 });
