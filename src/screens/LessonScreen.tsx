@@ -15,7 +15,7 @@ import { colors } from '../theme/colors';
 import { Button } from '../components/Button';
 import { IconButton } from '../components';
 import { Task, LessonStage } from '../types/lesson';
-import { supabase } from '../lib/supabase';
+import { supabase, markLessonComplete } from '../lib/supabase';
 
 // Task Components
 import { MultipleChoiceTask } from '../components/lesson/tasks/MultipleChoiceTask';
@@ -27,6 +27,7 @@ import { BranchingScenarioTask } from '../components/lesson/tasks/BranchingScena
 
 interface LessonScreenProps {
   lessonId?: string;
+  courseId?: string;
   onClose: () => void;
   onComplete: () => void;
   title?: string;
@@ -36,6 +37,7 @@ const { width } = Dimensions.get('window');
 
 export const LessonScreen: React.FC<LessonScreenProps> = ({
   lessonId,
+  courseId,
   onClose,
   onComplete,
   title = "Lesson"
@@ -229,6 +231,22 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
   const currentProgressStep = isLessonPhase ? currentStageIndex + 1 : totalSteps;
   const progress = (currentProgressStep / totalSteps) * 100;
 
+  // Save lesson progress to database
+  const saveLessonProgress = useCallback(async () => {
+    if (!lessonId) return;
+    
+    console.log('=== SAVING LESSON PROGRESS ===');
+    console.log('Lesson ID:', lessonId, 'Course ID:', courseId);
+    
+    const result = await markLessonComplete(lessonId, courseId, 0);
+    
+    if (result.success) {
+      console.log('Lesson progress saved successfully');
+    } else {
+      console.error('Failed to save lesson progress:', result.error);
+    }
+  }, [lessonId, courseId]);
+
   // Handlers
   const handleLessonContinue = () => {
     if (currentStageIndex < lessonStages.length - 1) {
@@ -237,18 +255,20 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
       // Move to tasks
       setCurrentTaskIndex(0);
     } else {
-      // No tasks, complete the lesson
-      onComplete();
+      // No tasks, complete the lesson and save progress
+      saveLessonProgress().then(() => onComplete());
     }
   };
 
-  const handleTaskComplete = useCallback((isCorrect: boolean) => {
+  const handleTaskComplete = useCallback(async (isCorrect: boolean) => {
     if (currentTaskIndex < tasks.length - 1) {
       setCurrentTaskIndex(currentTaskIndex + 1);
     } else {
+      // All tasks done, save progress and complete
+      await saveLessonProgress();
       onComplete();
     }
-  }, [currentTaskIndex, tasks.length, onComplete]);
+  }, [currentTaskIndex, tasks.length, onComplete, saveLessonProgress]);
 
   // Called by task components to register their submit handler
   const registerTaskControls = useCallback((

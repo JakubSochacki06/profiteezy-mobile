@@ -23,6 +23,7 @@ import { colors } from '../theme/colors';
 import { QuestionnaireNavigator, questionnaireData, QuestionnaireResult } from '../questionnaire';
 import { usePaywall } from '../hooks/usePaywall';
 import { MainTabNavigator } from '../navigation';
+import { CreateAccountScreen } from './CreateAccountScreen';
 import {
   GoogleSignin,
   isSuccessResponse,
@@ -64,6 +65,7 @@ export const LoginScreen = () => {
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [questionnaireStartIndex, setQuestionnaireStartIndex] = useState<number | undefined>(undefined);
   const [showHome, setShowHome] = useState(false);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
 
@@ -115,7 +117,7 @@ export const LoginScreen = () => {
     placement: 'onboarding_complete',
     onDismiss: (result) => {
       if (result.type === 'purchased' || result.type === 'restored') {
-        setShowHome(true);
+        setShowCreateAccount(true);
         setShowQuestionnaire(false);
       }
     },
@@ -176,9 +178,10 @@ export const LoginScreen = () => {
 
         if (data.session) {
           console.log('Successfully signed in with Google!', data.user?.email);
-          // Close the modal and navigate to home
+          // Close the modal and go to the last questionnaire step (before paywall)
           handleCloseModal();
-          setShowHome(true);
+          setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
+          setShowQuestionnaire(true);
         }
       }
     } catch (error: any) {
@@ -291,6 +294,18 @@ export const LoginScreen = () => {
     return <MainTabNavigator />;
   }
 
+  // Show Create Account screen after successful paywall purchase
+  if (showCreateAccount) {
+    return (
+      <CreateAccountScreen
+        onComplete={() => {
+          setShowHome(true);
+          setShowCreateAccount(false);
+        }}
+      />
+    );
+  }
+
   // Show questionnaire if user clicked Get Started
   if (showQuestionnaire) {
     return (
@@ -334,6 +349,13 @@ export const LoginScreen = () => {
             activeOpacity={0.7}
           >
             <Text style={styles.debugButtonText}>⏭️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setShowCreateAccount(true)}
+            style={styles.debugButton}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.debugButtonText}>👤</Text>
           </TouchableOpacity>
         </View>
 

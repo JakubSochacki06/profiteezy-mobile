@@ -4,7 +4,11 @@
       "Bash(git -C \"C:\\\\Users\\\\jsoch\\\\Desktop\\\\profiteezy-mobile\" worktree list)",
       "Bash(git -C C:UsersjsochDesktopprofiteezy-mobile worktree list)",
       "Bash(git -C /c/Users/jsoch/Desktop/profiteezy-mobile worktree list)",
-      "Bash(git -C C:/Users/jsoch/Desktop/profiteezy-mobile apply -)"
+      "Bash(git -C C:/Users/jsoch/Desktop/profiteezy-mobile apply -)",
+      "WebSearch"
     ]
-  }
+  },
+  "disabledMcpjsonServers": [
+    "supabase"
+  ]
 }

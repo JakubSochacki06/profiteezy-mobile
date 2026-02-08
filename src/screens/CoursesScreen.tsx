@@ -155,10 +155,11 @@ export const CoursesScreen = () => {
     return () => subscription.remove();
   }, [selectedCourse, activeLessonId]);
 
-  if (activeLessonId) {
+  if (activeLessonId && selectedCourse) {
     return (
       <LessonScreen
         lessonId={activeLessonId}
+        courseId={selectedCourse.id}
         onClose={() => setActiveLessonId(null)}
         onComplete={() => {
           console.log('Lesson completed');
@@ -174,6 +175,7 @@ export const CoursesScreen = () => {
         course={selectedCourse}
         onBack={() => setSelectedCourse(null)}
         onStartLesson={(lessonId) => setActiveLessonId(lessonId)}
+        key={activeLessonId ? 'refreshed' : selectedCourse.id}
       />
     );
   }

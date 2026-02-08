@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,54 @@ import {
   ScrollView,
   StatusBar,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { Button } from '../components';
+import { getCurrentLearningState, Course, Lesson } from '../lib/supabase';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+
+interface LearningState {
+  course: Course | null;
+  nextLesson: Lesson | null;
+  progress: number;
+  completedLessons: number;
+  totalLessons: number;
+}
 
 export const HomeScreen = () => {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<BottomTabNavigationProp<any>>();
+  
+  const [learningState, setLearningState] = useState<LearningState | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch learning state on focus (refreshes when coming back from lessons)
+  useFocusEffect(
+    useCallback(() => {
+      fetchLearningState();
+    }, [])
+  );
+
+  const fetchLearningState = async () => {
+    try {
+      setLoading(true);
+      const state = await getCurrentLearningState();
+      setLearningState(state);
+    } catch (err) {
+      console.error('Error fetching learning state:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStartLearning = () => {
+    // Navigate to Courses tab
+    navigation.navigate('Courses' as never);
+  };
 
   // Get current day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
   const today = new Date().getDay();
@@ -29,6 +69,10 @@ export const HomeScreen = () => {
     { day: 'Sat', active: today === 6 },
     { day: 'Sun', active: today === 0 },
   ];
+
+  // Calculate progress percentage
+  const progressPercent = learningState?.progress || 0;
+  const hasProgress = learningState && learningState.completedLessons > 0;
 
   return (
     <View style={styles.container}>
@@ -68,7 +112,9 @@ export const HomeScreen = () => {
           </View>
 
           {/* Pick up where you left off */}
-          <Text style={styles.sectionTitle}>Pick up where you left off</Text>
+          <Text style={styles.sectionTitle}>
+            {hasProgress ? 'Pick up where you left off' : 'Start your journey'}
+          </Text>
           
           <View style={styles.card}>
             <View style={styles.cardImageContainer}>
@@ -80,19 +126,42 @@ export const HomeScreen = () => {
             </View>
             
             <View style={styles.cardContent}>
-              <Text style={styles.cardSubtitle}>4 units • 4 hours</Text>
-              <Text style={styles.cardTitle}>First Steps to Profit with AI</Text>
-              
-              {/* Progress Bar */}
-              <View style={styles.progressContainer}>
-                <View style={[styles.progressBar, { width: '0%' }]} />
-              </View>
-              
-              <Button 
-                title="Start learning" 
-                onPress={() => console.log('Start learning pressed')}
-                fullWidth
-              />
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.accent} style={{ marginVertical: 20 }} />
+              ) : (
+                <>
+                  <Text style={styles.cardSubtitle}>
+                    {learningState?.totalLessons 
+                      ? `${learningState.completedLessons}/${learningState.totalLessons} lessons completed`
+                      : 'Loading...'}
+                  </Text>
+                  <Text style={styles.cardTitle}>
+                    {learningState?.course?.title || 'First Steps to Profit with AI'}
+                  </Text>
+                  
+                  {/* Next Lesson Info */}
+                  {learningState?.nextLesson && (
+                    <View style={styles.nextLessonContainer}>
+                      <Ionicons name="play-circle" size={16} color={colors.accent} />
+                      <Text style={styles.nextLessonText} numberOfLines={1}>
+                        Next: {learningState.nextLesson.title}
+                      </Text>
+                    </View>
+                  )}
+                  
+                  {/* Progress Bar */}
+                  <View style={styles.progressContainer}>
+                    <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
+                  </View>
+                  <Text style={styles.progressText}>{progressPercent}% complete</Text>
+                  
+                  <Button 
+                    title={hasProgress ? "Continue learning" : "Start learning"}
+                    onPress={handleStartLearning}
+                    fullWidth
+                  />
+                </>
+              )}
             </View>
           </View>
 
@@ -247,5 +316,27 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.accent,
     borderRadius: 3,
+  },
+  progressText: {
+    color: colors.text.secondary,
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    marginBottom: 16,
+  },
+  nextLessonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(95, 203, 15, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  nextLessonText: {
+    color: colors.accent,
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
+    flex: 1,
   },
 });

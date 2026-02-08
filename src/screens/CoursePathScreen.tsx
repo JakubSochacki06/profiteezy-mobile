@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { supabase } from '../lib/supabase';
+import { supabase, getCompletedLessons } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
 const NODE_SIZE = 90;
@@ -91,20 +91,55 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
       console.log('=== LESSONS ===');
       console.log(JSON.stringify(lessonsData, null, 2));
 
-      // Group lessons by stage
-      const stagesWithLessons: Stage[] = (stagesData || []).map((stage: any, stageIndex: number) => {
+      // Fetch user's completed lessons for this course
+      const completedLessonIds = await getCompletedLessons(course.id);
+      const completedSet = new Set(completedLessonIds);
+      
+      console.log('=== COMPLETED LESSONS ===');
+      console.log('Completed:', completedLessonIds);
+
+      // Build a flat list of all lessons in order to determine unlock status
+      const allLessonsOrdered: { id: string; stageIndex: number; lessonIndex: number }[] = [];
+      (stagesData || []).forEach((stage: any, stageIndex: number) => {
         const stageLessons = (lessonsData || [])
           .filter((lesson: any) => lesson.stage_id === stage.id)
-          .map((lesson: any, lessonIndex: number) => ({
+          .sort((a: any, b: any) => a.number - b.number);
+        stageLessons.forEach((lesson: any, lessonIndex: number) => {
+          allLessonsOrdered.push({ id: lesson.id, stageIndex, lessonIndex });
+        });
+      });
+
+      // Determine which lessons are unlocked:
+      // A lesson is unlocked if:
+      // 1. It's the first lesson (index 0 in allLessonsOrdered), OR
+      // 2. The previous lesson is completed
+      const unlockedSet = new Set<string>();
+      for (let i = 0; i < allLessonsOrdered.length; i++) {
+        const lesson = allLessonsOrdered[i];
+        if (i === 0) {
+          // First lesson is always unlocked
+          unlockedSet.add(lesson.id);
+        } else {
+          // Unlock if previous lesson is completed
+          const prevLesson = allLessonsOrdered[i - 1];
+          if (completedSet.has(prevLesson.id)) {
+            unlockedSet.add(lesson.id);
+          }
+        }
+      }
+
+      // Group lessons by stage with progress
+      const stagesWithLessons: Stage[] = (stagesData || []).map((stage: any) => {
+        const stageLessons = (lessonsData || [])
+          .filter((lesson: any) => lesson.stage_id === stage.id)
+          .map((lesson: any) => ({
             id: lesson.id,
             title: lesson.title,
             description: lesson.description,
             duration: lesson.duration,
             number: lesson.number,
-            // First lesson of first stage is unlocked
-            // TODO: Calculate based on actual user progress
-            isCompleted: false,
-            isLocked: !(stageIndex === 0 && lessonIndex === 0),
+            isCompleted: completedSet.has(lesson.id),
+            isLocked: !unlockedSet.has(lesson.id),
           }));
 
         return {
@@ -119,7 +154,7 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
       console.log('=== STAGES WITH LESSONS ===');
       stagesWithLessons.forEach(s => {
         console.log(`Stage: ${s.title} (${s.lessons.length} lessons)`);
-        s.lessons.forEach(l => console.log(`  - ${l.title}`));
+        s.lessons.forEach(l => console.log(`  - ${l.title} [${l.isCompleted ? 'DONE' : l.isLocked ? 'LOCKED' : 'UNLOCKED'}]`));
       });
 
       setStages(stagesWithLessons);

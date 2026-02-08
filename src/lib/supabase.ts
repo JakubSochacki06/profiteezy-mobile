@@ -127,3 +127,264 @@ export interface UserLesson {
   created_at: string;
   updated_at: string;
 }
+
+export interface UserLessonProgress {
+  id: string;
+  user_id: string;
+  lesson_id: string;
+  course_id: string | null;
+  is_completed: boolean;
+  completed_at: string | null;
+  points_earned: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Profile {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  superwall_customer_id: string | null;
+  subscription_status: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Upsert a user profile to the profiles table
+ */
+export async function upsertProfile(profile: Omit<Profile, 'created_at' | 'updated_at'>): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        ...profile,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'id',
+      });
+
+    if (error) {
+      console.error('Error upserting profile:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in upsertProfile:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+// ===== Progress Helper Functions =====
+
+/**
+ * Mark a lesson as completed for the current user
+ */
+export async function markLessonComplete(
+  lessonId: string,
+  courseId?: string,
+  pointsEarned: number = 0
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { success: false, error: 'User not authenticated' };
+    }
+
+    const { error } = await supabase
+      .from('user_lesson_progress')
+      .upsert({
+        user_id: user.id,
+        lesson_id: lessonId,
+        course_id: courseId || null,
+        is_completed: true,
+        completed_at: new Date().toISOString(),
+        points_earned: pointsEarned,
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,lesson_id',
+      });
+
+    if (error) {
+      console.error('Error marking lesson complete:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in markLessonComplete:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Get all completed lesson IDs for a specific course
+ */
+export async function getCompletedLessons(courseId: string): Promise<string[]> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from('user_lesson_progress')
+      .select('lesson_id')
+      .eq('user_id', user.id)
+      .eq('course_id', courseId)
+      .eq('is_completed', true);
+
+    if (error) {
+      console.error('Error fetching completed lessons:', error);
+      return [];
+    }
+
+    return (data || []).map(row => row.lesson_id);
+  } catch (err) {
+    console.error('Error in getCompletedLessons:', err);
+    return [];
+  }
+}
+
+/**
+ * Get the user's overall progress for a course
+ */
+export async function getCourseProgress(courseId: string): Promise<{
+  completedCount: number;
+  totalCount: number;
+  percentage: number;
+  lastCompletedLessonId: string | null;
+}> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { completedCount: 0, totalCount: 0, percentage: 0, lastCompletedLessonId: null };
+    }
+
+    // Get total lessons in course
+    const { count: totalCount, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('*', { count: 'exact', head: true })
+      .eq('course_id', courseId);
+
+    if (lessonsError) throw lessonsError;
+
+    // Get completed lessons
+    const { data: completedData, error: progressError } = await supabase
+      .from('user_lesson_progress')
+      .select('lesson_id, completed_at')
+      .eq('user_id', user.id)
+      .eq('course_id', courseId)
+      .eq('is_completed', true)
+      .order('completed_at', { ascending: false });
+
+    if (progressError) throw progressError;
+
+    const completedCount = completedData?.length || 0;
+    const total = totalCount || 0;
+    const percentage = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+    const lastCompletedLessonId = completedData?.[0]?.lesson_id || null;
+
+    return {
+      completedCount,
+      totalCount: total,
+      percentage,
+      lastCompletedLessonId,
+    };
+  } catch (err) {
+    console.error('Error in getCourseProgress:', err);
+    return { completedCount: 0, totalCount: 0, percentage: 0, lastCompletedLessonId: null };
+  }
+}
+
+/**
+ * Get the next lesson the user should do in a course
+ * Returns the first uncompleted lesson, or null if all completed
+ */
+export async function getNextLesson(courseId: string): Promise<Lesson | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // Return first lesson if not authenticated
+      const { data: firstLesson } = await supabase
+        .from('lessons')
+        .select('*')
+        .eq('course_id', courseId)
+        .order('number', { ascending: true })
+        .limit(1)
+        .single();
+      return firstLesson || null;
+    }
+
+    // Get all lessons ordered by number
+    const { data: lessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('number', { ascending: true });
+
+    if (lessonsError || !lessons) return null;
+
+    // Get completed lesson IDs
+    const completedLessonIds = await getCompletedLessons(courseId);
+    const completedSet = new Set(completedLessonIds);
+
+    // Find first uncompleted lesson
+    for (const lesson of lessons) {
+      if (!completedSet.has(lesson.id)) {
+        return lesson as Lesson;
+      }
+    }
+
+    // All lessons completed, return null
+    return null;
+  } catch (err) {
+    console.error('Error in getNextLesson:', err);
+    return null;
+  }
+}
+
+/**
+ * Get the user's current learning state for the home screen
+ */
+export async function getCurrentLearningState(): Promise<{
+  course: Course | null;
+  nextLesson: Lesson | null;
+  progress: number;
+  completedLessons: number;
+  totalLessons: number;
+} | null> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // Get the first live course (or the course user has started)
+    const { data: courses, error: courseError } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('is_live', true)
+      .limit(1);
+
+    if (courseError || !courses || courses.length === 0) return null;
+
+    const course = courses[0] as Course;
+    const courseProgress = await getCourseProgress(course.id);
+    const nextLesson = await getNextLesson(course.id);
+
+    return {
+      course,
+      nextLesson,
+      progress: courseProgress.percentage,
+      completedLessons: courseProgress.completedCount,
+      totalLessons: courseProgress.totalCount,
+    };
+  } catch (err) {
+    console.error('Error in getCurrentLearningState:', err);
+    return null;
+  }
+}
