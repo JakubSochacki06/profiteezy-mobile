@@ -344,7 +344,31 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      
+
+      {/* Subtle $ pattern — full page */}
+      <View style={styles.patternContainer} pointerEvents="none">
+        {Array.from({ length: 120 }).map((_, i) => {
+          const cols = 5;
+          const row = Math.floor(i / cols);
+          const col = i % cols;
+          const spacing = width / cols;
+          return (
+            <Text
+              key={i}
+              style={[
+                styles.patternChar,
+                {
+                  left: col * spacing + spacing / 2 - 16,
+                  top: row * spacing,
+                },
+              ]}
+            >
+              $
+            </Text>
+          );
+        })}
+      </View>
+
       {/* Sticky Header */}
       <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -359,6 +383,7 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
 
       {/* Path Content */}
       <View style={{flex: 1}}>
+
         {stages.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="book-outline" size={64} color={colors.text.tertiary} />
@@ -441,6 +466,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'Inter_600SemiBold',
+  },
+  patternContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+    zIndex: 0,
+  },
+  patternChar: {
+    position: 'absolute',
+    fontSize: 24,
+    color: colors.text.tertiary,
+    opacity: 0.05,
+    fontFamily: 'Inter_700Bold',
   },
   scrollContent: {
     paddingVertical: 24,

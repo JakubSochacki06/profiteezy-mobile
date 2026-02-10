@@ -52,6 +52,7 @@ export interface Course {
   what_youll_learn: any | null;
   course_includes: any | null;
   video_url: string | null;
+  image_url: string | null;
   is_finished: boolean;
   created_at: string;
   updated_at: string;
@@ -126,6 +127,16 @@ export interface UserLesson {
   points_earned: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserDailyMission {
+  id: string;
+  user_id: string;
+  mission_key: string;
+  progress: number;
+  is_completed: boolean;
+  completed_at: string | null;
+  date: string;
 }
 
 export interface UserLessonProgress {
@@ -386,5 +397,95 @@ export async function getCurrentLearningState(): Promise<{
   } catch (err) {
     console.error('Error in getCurrentLearningState:', err);
     return null;
+  }
+}
+
+// ===== Daily Missions Helper Functions =====
+
+const DAILY_MISSION_KEYS = ['complete_lesson', 'earn_points'] as const;
+
+/**
+ * Fetch today's daily missions for the user, creating default rows if none exist
+ */
+export async function fetchDailyMissions(userId: string): Promise<UserDailyMission[]> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Try to fetch existing missions for today
+    const { data: existing, error: fetchError } = await supabase
+      .from('user_daily_missions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', today);
+
+    if (fetchError) {
+      console.error('Error fetching daily missions:', fetchError);
+      return [];
+    }
+
+    // If missions already exist for today, return them
+    if (existing && existing.length > 0) {
+      return existing as UserDailyMission[];
+    }
+
+    // Otherwise, create default missions for today
+    const defaultMissions = DAILY_MISSION_KEYS.map((key) => ({
+      user_id: userId,
+      mission_key: key,
+      progress: 0,
+      is_completed: false,
+      date: today,
+    }));
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('user_daily_missions')
+      .upsert(defaultMissions, { onConflict: 'user_id,mission_key,date' })
+      .select();
+
+    if (insertError) {
+      console.error('Error inserting daily missions:', insertError);
+      return [];
+    }
+
+    return (inserted || []) as UserDailyMission[];
+  } catch (err) {
+    console.error('Error in fetchDailyMissions:', err);
+    return [];
+  }
+}
+
+/**
+ * Update progress for a specific daily mission
+ */
+export async function updateMissionProgress(
+  userId: string,
+  missionKey: string,
+  progress: number,
+  target: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const isCompleted = progress >= target;
+
+    const { error } = await supabase
+      .from('user_daily_missions')
+      .update({
+        progress,
+        is_completed: isCompleted,
+        completed_at: isCompleted ? new Date().toISOString() : null,
+      })
+      .eq('user_id', userId)
+      .eq('mission_key', missionKey)
+      .eq('date', today);
+
+    if (error) {
+      console.error('Error updating mission progress:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in updateMissionProgress:', err);
+    return { success: false, error: err.message };
   }
 }

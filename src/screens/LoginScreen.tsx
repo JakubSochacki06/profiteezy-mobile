@@ -50,6 +50,7 @@ const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 GoogleSignin.configure({
   // webClientId is REQUIRED for getting the idToken needed for Supabase auth
   webClientId: googleWebClientId,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
 });
 
 export const LoginScreen = () => {

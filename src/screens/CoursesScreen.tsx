@@ -22,17 +22,14 @@ import { supabase, Course as SupabaseCourse } from '../lib/supabase';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 const { width } = Dimensions.get('window');
+const CARD_WIDTH = (width - 50) / 2;
 
 // Local course type with progress
 interface Course extends SupabaseCourse {
   progress: number;
   lesson_count: number;
   stage_count: number;
-  image_url?: string | null;
 }
-
-// Fallback image for courses without an image_url
-const DEFAULT_COURSE_IMAGE = require('../../assets/emojis/laptopEmoji.png');
 
 // Map icon names to colors for visual variety
 const ICON_COLORS: Record<string, string> = {
@@ -72,9 +69,6 @@ export const CoursesScreen = () => {
       setLoading(true);
       setError(null);
 
-      console.log('=== FETCHING COURSES ===');
-
-      // Fetch live courses with lesson count
       const { data, error: fetchError } = await supabase
         .from('courses')
         .select(`
@@ -89,10 +83,6 @@ export const CoursesScreen = () => {
         throw fetchError;
       }
 
-      console.log('=== RAW COURSES DATA ===');
-      console.log(JSON.stringify(data, null, 2));
-
-      // Transform data to include lesson count and default progress
       const coursesWithProgress: Course[] = (data || []).map((course: any) => {
         const lessonCount = course.lessons?.length || 0;
         const stageCount = course.stages?.length || 0;
@@ -101,19 +91,13 @@ export const CoursesScreen = () => {
           ...course,
           lesson_count: lessonCount,
           stage_count: stageCount,
-          progress: 0, // TODO: Fetch actual progress from user_courses table
+          progress: 0,
         };
-      });
-
-      console.log('=== PROCESSED COURSES ===');
-      coursesWithProgress.forEach(c => {
-        console.log(`- ${c.title}: ${c.lesson_count} lessons, ${c.stage_count} stages`);
       });
 
       setCourses(coursesWithProgress);
     } catch (err: any) {
-      console.error('=== ERROR FETCHING COURSES ===');
-      console.error('Error:', err);
+      console.error('Error fetching courses:', err);
       setError(err.message || 'Failed to fetch courses');
     } finally {
       setLoading(false);
@@ -180,49 +164,38 @@ export const CoursesScreen = () => {
     );
   }
 
-  const renderItem = ({ item }: { item: Course }) => {
-    // Determine color based on icon or default to accent
-    // If no icon is provided, we can fallback to the app theme accent or a cycled color
-    const themeColor = item.icon ? (ICON_COLORS[item.icon] || colors.accent) : colors.accent;
+  const getIconColor = (item: Course) =>
+    item.icon ? (ICON_COLORS[item.icon] || colors.accent) : colors.accent;
 
-    // For the icon display
-    const IconComponent = () => (
-      item.image_url ? (
-        <Image
-          source={{ uri: item.image_url }}
-          style={styles.courseImage}
-          resizeMode="contain"
-        />
-      ) : (
-        <View style={[styles.iconPlaceholder, { backgroundColor: `${themeColor}20` }]}>
-          <Text style={[styles.iconText, { color: themeColor }]}>
-            {item.title.charAt(0)}
-          </Text>
-        </View>
-      )
-    );
+  const renderGridItem = ({ item }: { item: Course }) => {
+    const imageUrl = item.image_url;
+    const iconColor = getIconColor(item);
 
     return (
       <TouchableOpacity
-        style={[styles.card, { borderColor: themeColor }]}
+        style={styles.card}
         onPress={() => setSelectedCourse(item)}
-        activeOpacity={0.9}
+        activeOpacity={0.8}
       >
-        <View style={styles.cardHeader}>
-          <View style={styles.iconContainer}>
-            <IconComponent />
-          </View>
+        <View style={[styles.imageContainer, !imageUrl && { backgroundColor: `${iconColor}20` }]}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.courseImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <Text style={[styles.iconText, { color: iconColor }]}>
+              {item.title.charAt(0)}
+            </Text>
+          )}
         </View>
-
-        <Text style={styles.cardTitle}>{item.title}</Text>
-
-        <View style={styles.progressSection}>
-          <Text style={styles.sectionText}>STAGES</Text>
-          <Text style={styles.progressText}>0/{item.stage_count || item.lesson_count || 20}</Text>
-        </View>
-
-        <View style={styles.progressBarContainer}>
-          <View style={[styles.progressBar, { width: `${item.progress * 100}%`, backgroundColor: themeColor }]} />
+        <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.cardSubtitle}>
+          {item.lesson_count || 0} lessons • {item.difficulty || 'Beginner'}
+        </Text>
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { width: `${item.progress * 100}%` }]} />
         </View>
       </TouchableOpacity>
     );
@@ -271,12 +244,14 @@ export const CoursesScreen = () => {
       ) : (
         <FlatList
           data={courses}
-          renderItem={renderItem}
+          renderItem={renderGridItem}
           keyExtractor={(item) => item.id}
+          numColumns={2}
           contentContainerStyle={[
             styles.listContainer,
             courses.length === 0 && styles.listContainerEmpty,
           ]}
+          columnWrapperStyle={courses.length > 0 ? styles.columnWrapper : undefined}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
           refreshing={loading}
@@ -309,90 +284,64 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: 20,
     paddingBottom: 40,
-    gap: 20,
   },
   listContainerEmpty: {
     flex: 1,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 2,
-    // Add subtle shadow/elevation
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  cardHeader: {
-    marginBottom: 8,
+  columnWrapper: {
     flexDirection: 'row',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  iconContainer: {
-    width: 48,
-    height: 48,
+  card: {
+    width: CARD_WIDTH,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 80,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  iconPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 10,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   courseImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: '100%',
+    height: '100%',
   },
   iconText: {
-    fontSize: 20,
+    fontSize: 36,
     fontWeight: 'bold',
     fontFamily: 'Inter_700Bold',
   },
   cardTitle: {
-    fontSize: 22,
+    fontSize: 15,
     fontWeight: 'bold',
     color: colors.text.primary,
-    marginBottom: 16,
+    marginBottom: 4,
     fontFamily: 'Inter_700Bold',
-    letterSpacing: 0.5,
   },
-  progressSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sectionText: {
-    fontSize: 13,
+  cardSubtitle: {
+    fontSize: 12,
     color: colors.text.secondary,
-    fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    marginBottom: 10,
+    fontFamily: 'Inter_500Medium',
   },
-  progressText: {
-    fontSize: 14,
-    color: colors.text.primary,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  progressBarContainer: {
+  progressContainer: {
     width: '100%',
-    height: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 4,
-    overflow: 'hidden',
+    height: 6,
+    backgroundColor: colors.background,
+    borderRadius: 3,
   },
   progressBar: {
     height: '100%',
-    borderRadius: 4,
+    backgroundColor: colors.accent,
+    borderRadius: 3,
   },
   loadingContainer: {
     flex: 1,
