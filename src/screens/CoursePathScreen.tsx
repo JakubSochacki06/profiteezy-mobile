@@ -345,30 +345,6 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
-      {/* Subtle $ pattern — full page */}
-      <View style={styles.patternContainer} pointerEvents="none">
-        {Array.from({ length: 120 }).map((_, i) => {
-          const cols = 5;
-          const row = Math.floor(i / cols);
-          const col = i % cols;
-          const spacing = width / cols;
-          return (
-            <Text
-              key={i}
-              style={[
-                styles.patternChar,
-                {
-                  left: col * spacing + spacing / 2 - 16,
-                  top: row * spacing,
-                },
-              ]}
-            >
-              $
-            </Text>
-          );
-        })}
-      </View>
-
       {/* Sticky Header */}
       <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
@@ -391,10 +367,42 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
             <Text style={styles.emptySubtitle}>This course doesn't have any lessons yet</Text>
           </View>
         ) : (
-          <ScrollView 
+          <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
+            {/* Subtle $ pattern — scrolls with content */}
+            {(() => {
+              const cols = 5;
+              const spacing = width / cols;
+              const totalLessons = stages.reduce((acc, s) => acc + s.lessons.length, 0);
+              const estimatedHeight = stages.length * 200 + totalLessons * (NODE_SIZE + 40) + 200;
+              const rows = Math.ceil(estimatedHeight / spacing);
+              const count = rows * cols;
+              return (
+                <View style={styles.patternContainer} pointerEvents="none">
+                  {Array.from({ length: count }).map((_, i) => {
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    return (
+                      <Text
+                        key={i}
+                        style={[
+                          styles.patternChar,
+                          {
+                            left: col * spacing + spacing / 2 - 16,
+                            top: row * spacing,
+                          },
+                        ]}
+                      >
+                        $
+                      </Text>
+                    );
+                  })}
+                </View>
+              );
+            })()}
+
             {stages.map((stage, stageIndex) => (
               <View key={stage.id} style={styles.chapterContainer}>
                 {/* Stage Header */}

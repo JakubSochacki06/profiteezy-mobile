@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { Button } from '../components';
 import { getCurrentLearningState, Course, Lesson, UserDailyMission, fetchDailyMissions, supabase } from '../lib/supabase';
+import { TouchableOpacity } from 'react-native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
 interface LearningState {
@@ -125,59 +126,43 @@ export const HomeScreen = () => {
             </View>
           </View>
 
-          {/* Pick up where you left off */}
+          {/* Continue learning card */}
           <Text style={styles.sectionTitle}>
             {hasProgress ? 'Pick up where you left off' : 'Start your journey'}
           </Text>
 
-          <View style={styles.card}>
-            <View style={styles.cardImageContainer}>
-              <Image
-                source={require('../../assets/questionnaire/questionnaireImage1.png')}
-                style={styles.cardImage}
-                resizeMode="contain"
-              />
-            </View>
-
-            <View style={styles.cardContent}>
-              {loading ? (
-                <ActivityIndicator size="small" color={colors.accent} style={{ marginVertical: 20 }} />
-              ) : (
-                <>
-                  <Text style={styles.cardSubtitle}>
-                    {learningState?.totalLessons
-                      ? `${learningState.completedLessons}/${learningState.totalLessons} lessons completed`
-                      : 'Loading...'}
-                  </Text>
-                  <Text style={styles.cardTitle}>
-                    {learningState?.course?.title || 'First Steps to Profit with AI'}
-                  </Text>
-
-                  {/* Next Lesson Info */}
-                  {learningState?.nextLesson && (
-                    <View style={styles.nextLessonContainer}>
-                      <Ionicons name="play-circle" size={16} color={colors.accent} />
-                      <Text style={styles.nextLessonText} numberOfLines={1}>
-                        Next: {learningState.nextLesson.title}
-                      </Text>
+          <TouchableOpacity style={styles.card} onPress={handleStartLearning} activeOpacity={0.8}>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.accent} style={{ margin: 16 }} />
+            ) : (
+              <>
+                <View style={styles.cardImageContainer}>
+                  {learningState?.course?.image_url ? (
+                    <Image
+                      source={{ uri: learningState.course.image_url }}
+                      style={styles.cardImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={styles.cardImagePlaceholder}>
+                      <Ionicons name="book" size={24} color={colors.text.tertiary} />
                     </View>
                   )}
-
-                  {/* Progress Bar */}
-                  <View style={styles.progressContainer}>
-                    <View style={[styles.progressBar, { width: `${progressPercent}%` }]} />
-                  </View>
-                  <Text style={styles.progressText}>{progressPercent}% complete</Text>
-
-                  <Button
-                    title={hasProgress ? "Continue learning" : "Start learning"}
-                    onPress={handleStartLearning}
-                    fullWidth
-                  />
-                </>
-              )}
-            </View>
-          </View>
+                </View>
+                <View style={styles.cardContent}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>
+                    {learningState?.nextLesson?.title || learningState?.course?.title || 'Start learning'}
+                  </Text>
+                  <Text style={styles.cardSubtitle} numberOfLines={1}>
+                    {learningState?.course?.title || 'No course yet'} • {learningState?.completedLessons}/{learningState?.totalLessons} lessons
+                  </Text>
+                </View>
+                <View style={styles.cardButton}>
+                  <Ionicons name="play" size={18} color={colors.background} />
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
 
           {/* Daily Missions */}
           <View style={styles.missionsSection}>
@@ -329,70 +314,55 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   card: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: 20,
-    overflow: 'hidden',
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
   cardImageContainer: {
-    height: 180,
-    backgroundColor: '#F5F5F5', // Light background for image to pop if needed
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: colors.background,
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  cardImagePlaceholder: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  cardImage: {
-    width: '60%',
-    height: '80%',
-  },
   cardContent: {
-    padding: 20,
-  },
-  cardSubtitle: {
-    color: colors.text.secondary,
-    fontSize: 14,
-    marginBottom: 8,
-    fontFamily: 'Inter_500Medium',
+    flex: 1,
+    marginLeft: 12,
   },
   cardTitle: {
     color: colors.text.primary,
-    fontSize: 20,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 16,
     fontFamily: 'Inter_700Bold',
   },
-  progressContainer: {
-    height: 6,
-    backgroundColor: colors.background,
-    borderRadius: 3,
-    marginBottom: 20,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: colors.accent,
-    borderRadius: 3,
-  },
-  progressText: {
+  cardSubtitle: {
     color: colors.text.secondary,
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    marginBottom: 16,
+    marginTop: 2,
   },
-  nextLessonContainer: {
-    flexDirection: 'row',
+  cardButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(95, 203, 15, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 16,
-    gap: 8,
-  },
-  nextLessonText: {
-    color: colors.accent,
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    flex: 1,
+    marginLeft: 12,
   },
   missionsSection: {
     marginTop: 30,

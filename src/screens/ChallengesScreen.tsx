@@ -13,11 +13,21 @@ import { colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography } from '../components/Typography';
 
+// League images
+const LEAGUE_IMAGES = {
+  league1: require('../../assets/leagues/League1.png'),
+  league2: require('../../assets/leagues/League2.png'),
+  league3: require('../../assets/leagues/League3.png'),
+  league4: require('../../assets/leagues/League4.png'),
+  league5: require('../../assets/leagues/League5.png'),
+  unavailable: require('../../assets/leagues/LeagueUnavailable.png'),
+};
+
 // Mock Data for Leaderboard
 const LEADERBOARD_DATA = [
   { id: '1', name: 'Carolina', score: 3644, rank: 1, avatarColor: '#F472B6' },
   { id: '2', name: 'Valfera', score: 2004, rank: 2, avatarColor: '#FB7185' },
-  { id: '3', name: 'Noah Brown', score: 1686, rank: 3, avatarColor: '#A78BFA' }, // Placeholder for image
+  { id: '3', name: 'Noah Brown', score: 1686, rank: 3, avatarColor: '#A78BFA' },
   { id: '4', name: 'DeiMudder', score: 1405, rank: 4, avatarColor: '#FBBF24' },
   { id: '5', name: 'Maryam', score: 1380, rank: 5, avatarColor: '#C084FC' },
   { id: '6', name: 'RenatoW97', score: 1250, rank: 6, avatarColor: '#FDA4AF' },
@@ -27,11 +37,11 @@ const LEADERBOARD_DATA = [
 ];
 
 const LEAGUES = [
-  { id: 'stone', name: 'Stone', icon: 'medal', locked: false, active: true },
-  { id: 'silver', name: 'Silver', icon: 'medal', locked: true, active: false },
-  { id: 'gold', name: 'Gold', icon: 'medal', locked: true, active: false },
-  { id: 'platinum', name: 'Platinum', icon: 'medal', locked: true, active: false },
-  { id: 'diamond', name: 'Diamond', icon: 'medal', locked: true, active: false },
+  { id: 'stone', name: 'Stone', image: LEAGUE_IMAGES.league1, locked: false, active: true },
+  { id: 'silver', name: 'Silver', image: LEAGUE_IMAGES.league2, locked: true, active: false },
+  { id: 'gold', name: 'Gold', image: LEAGUE_IMAGES.league3, locked: true, active: false },
+  { id: 'platinum', name: 'Platinum', image: LEAGUE_IMAGES.league4, locked: true, active: false },
+  { id: 'diamond', name: 'Diamond', image: LEAGUE_IMAGES.league5, locked: true, active: false },
 ];
 
 export const ChallengesScreen = () => {
@@ -45,13 +55,13 @@ export const ChallengesScreen = () => {
             key={league.id}
             style={[
               styles.leagueIconWrapper,
-              league.active ? styles.leagueIconActive : styles.leagueIconLocked
+              league.active && styles.leagueIconActive,
             ]}
           >
-            <Ionicons
-              name={league.locked ? "lock-closed" : "trophy"}
-              size={24}
-              color={league.active ? '#B45309' : '#4B5563'}
+            <Image
+              source={league.locked ? LEAGUE_IMAGES.unavailable : league.image}
+              style={[styles.leagueImage, league.locked && { opacity: 0.3 }]}
+              resizeMode="contain"
             />
           </View>
         ))}
@@ -142,9 +152,9 @@ const styles = StyleSheet.create({
   leagueContainer: {
     paddingHorizontal: 24,
     paddingVertical: 16,
-    backgroundColor: '#2D3748', // Darker blue/slate background for league header area
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: colors.border,
     marginBottom: 0,
   },
   leagueIconsRow: {
@@ -153,22 +163,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   leagueIconWrapper: {
-    width: 64,
-    height: 64,
+    width: 56,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    backgroundColor: 'rgba(0,0,0,0.2)',
   },
   leagueIconActive: {
-    backgroundColor: '#FDBA74',
-    borderColor: '#B45309',
+    transform: [{ scale: 1.15 }],
   },
-  leagueIconLocked: {
-    backgroundColor: '#4B5563', // Grayed out
-    opacity: 0.5,
+  leagueImage: {
+    width: 48,
+    height: 48,
   },
   leagueInfoRow: {
     flexDirection: 'row',
