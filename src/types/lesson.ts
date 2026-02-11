@@ -1,78 +1,73 @@
+// Task types supported in lesson stages
 export type TaskType = 
-  | 'drag_drop' 
   | 'multiple_choice' 
+  | 'drag_drop' 
   | 'sort' 
-  | 'fill_word' 
-  | 'free_text' 
-  | 'branching_scenario';
+  | 'fill_word';
 
-export interface BaseTask {
-  id: string;
-  type: TaskType;
-  question: string; // Main instruction or question
-}
-
-export interface MultipleChoiceTask extends BaseTask {
-  type: 'multiple_choice';
+// Task data structures for each task type
+export interface MultipleChoiceTaskData {
+  question: string;
   options: string[];
-  correctIndex: number;
+  correct_index: number[]; // Array of correct option indices, e.g. [0, 2, 3]
 }
 
-export interface DragDropTask extends BaseTask {
-  type: 'drag_drop';
-  items: string[]; // Items to be ordered
-  correctOrder: string[]; // The correct order of items
+export interface DragDropTaskData {
+  question: string;
+  items: string[];
+  correct_order: number[];
 }
 
-export interface SortTask extends BaseTask {
-  type: 'sort';
-  categories: { id: string; name: string }[];
-  items: { id: string; content: string; categoryId: string }[];
+export interface SortTaskData {
+  question: string;
+  categories: string[];
+  items: { text: string; category: string }[];
 }
 
-export interface FillWordTask extends BaseTask {
-  type: 'fill_word';
-  sentence: string; // Text with placeholders like "{0}", "{1}" or just segments
-  // Better structure for rendering:
-  segments: (string | null)[]; // null represents a blank
-  words: string[]; // The pool of words to drag
-  correctWords: string[]; // The correct words for the blanks in order
+export interface FillWordTaskData {
+  question: string;
+  segments: (string | null)[];
+  words: string[];
+  correct_words: string[];
 }
 
-export interface FreeTextTask extends BaseTask {
-  type: 'free_text';
-  prompt: string;
-  placeholder?: string;
-  minChars?: number;
-}
+export type TaskData = 
+  | MultipleChoiceTaskData 
+  | DragDropTaskData 
+  | SortTaskData 
+  | FillWordTaskData;
 
-export interface BranchingScenarioTask extends BaseTask {
-  type: 'branching_scenario';
-  startScenarioId: string;
-  scenarios: {
-    [id: string]: {
-      text: string;
-      choices: { 
-        text: string; 
-        nextId: string | 'win' | 'lose';
-        feedback?: string; 
-      }[];
-      backgroundImage?: any;
-    };
-  };
-}
-
-export type Task = 
-  | MultipleChoiceTask 
-  | DragDropTask 
-  | SortTask 
-  | FillWordTask 
-  | FreeTextTask 
-  | BranchingScenarioTask;
-
+// Unified lesson stage - can be text-only or text + task
 export interface LessonStage {
   id: string;
-  title: string;
+  lesson_id: string;
+  order_number: number;
+  title: string | null;
   content: string;
-  image?: any;
+  points: number | null;
+  duration: number | null;
+  // Task fields (null means text-only stage)
+  task_type: TaskType | null;
+  task_data: TaskData | null;
+}
+
+// Stage type derived from task_type presence
+export type StageType = 'text_only' | 'text_with_task';
+
+// Helper to determine stage type
+export function getStageType(stage: LessonStage): StageType {
+  return stage.task_type ? 'text_with_task' : 'text_only';
+}
+
+// Props for task components
+export interface TaskComponentProps<T extends TaskData> {
+  taskData: T;
+  // Called when user selection changes - reports if task is ready to check
+  onReadyChange: (isReady: boolean) => void;
+  // Called to register the check answer function
+  registerCheckAnswer: (checkFn: () => boolean) => void;
+  // Whether the result is being shown (task should be disabled)
+  showResult: boolean;
+  // Current attempt count (for reset handling)
+  attemptCount: number;
 }

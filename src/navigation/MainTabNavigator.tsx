@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ChallengesScreen } from '../screens/ChallengesScreen';
-import { CoursesScreen } from '../screens/CoursesScreen';
+import { DailyMissionsScreen } from '../screens/DailyMissionsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { colors } from '../theme/colors';
 import { Platform } from 'react-native';
@@ -12,7 +12,7 @@ import { Platform } from 'react-native';
 export type MainTabParamList = {
   Home: undefined;
   Challenges: undefined;
-  Courses: undefined;
+  Missions: undefined;
   Profile: undefined;
 };
 
@@ -47,8 +47,8 @@ export const MainTabNavigator = () => {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Challenges') {
             iconName = focused ? 'trophy' : 'trophy-outline';
-          } else if (route.name === 'Courses') {
-            iconName = focused ? 'book' : 'book-outline';
+          } else if (route.name === 'Missions') {
+            iconName = focused ? 'checkbox' : 'checkbox-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -80,10 +80,10 @@ export const MainTabNavigator = () => {
         }}
       />
       <Tab.Screen 
-        name="Courses"  
-        component={CoursesScreen}
+        name="Missions"  
+        component={DailyMissionsScreen}
         options={{
-          tabBarLabel: 'Courses',
+          tabBarLabel: 'Missions',
           tabBarStyle: defaultTabBarStyle,
         }}
       />

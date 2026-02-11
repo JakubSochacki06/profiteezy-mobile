@@ -1,212 +1,236 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useLayoutEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
-  Image,
-  ScrollView,
-  StatusBar,
-  Platform,
   ActivityIndicator,
+  TouchableOpacity,
+  StatusBar,
+  Image,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
-import { Button } from '../components';
-import { getCurrentLearningState, Course, Lesson, UserDailyMission, fetchDailyMissions, supabase } from '../lib/supabase';
-import { TouchableOpacity } from 'react-native';
+import {
+  getCurrentLearningState,
+  Course,
+  supabase,
+  fetchDailyMissions,
+  UserDailyMission,
+} from '../lib/supabase';
+import { CoursePathScreen } from './CoursePathScreen';
+import { LessonScreen } from './LessonScreen';
+import { CourseSelectionModal } from '../components';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 
-interface LearningState {
-  course: Course | null;
-  nextLesson: Lesson | null;
-  progress: number;
-  completedLessons: number;
-  totalLessons: number;
-}
-
-const DAILY_MISSIONS = [
-  { key: 'complete_lesson', title: 'Complete a lesson', target: 1, reward: 25, icon: 'book-outline' as const },
-  { key: 'earn_points', title: 'Earn 50 points', target: 50, reward: 15, icon: 'star-outline' as const },
-];
+const TOTAL_DAILY_MISSIONS = 2;
 
 export const HomeScreen = () => {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<BottomTabNavigationProp<any>>();
 
-  const [learningState, setLearningState] = useState<LearningState | null>(null);
-  const [missions, setMissions] = useState<UserDailyMission[]>([]);
+  const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const [missions, setMissions] = useState<UserDailyMission[]>([]);
+  const [streak, setStreak] = useState(0);
+  const [userPoints, setUserPoints] = useState(0);
+  const [showCourseModal, setShowCourseModal] = useState(false);
 
-  // Fetch learning state on focus (refreshes when coming back from lessons)
-  useFocusEffect(
-    useCallback(() => {
-      fetchLearningState();
-    }, [])
-  );
+  // Calculate bottom padding for tab bar
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 8 : 8);
+  const tabBarHeight = Platform.OS === 'ios' 
+    ? 60 + bottomPadding 
+    : 60 + bottomPadding;
 
-  const fetchLearningState = async () => {
+  // Hide tab bar when lesson is active for full screen experience
+  useLayoutEffect(() => {
+    if (activeLessonId) {
+      navigation.setOptions({
+        tabBarStyle: { display: 'none' },
+      });
+    } else {
+      navigation.setOptions({
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+          height: tabBarHeight,
+          paddingBottom: bottomPadding,
+          paddingTop: 8,
+          display: 'flex',
+        },
+      });
+    }
+  }, [activeLessonId, navigation, tabBarHeight, bottomPadding]);
+
+  const fetchState = async (courseId?: string) => {
     try {
-      setLoading(true);
+      if (!course) setLoading(true);
+
       const [state, { data: { user } }] = await Promise.all([
-        getCurrentLearningState(),
+        getCurrentLearningState(courseId),
         supabase.auth.getUser(),
       ]);
-      setLearningState(state);
+
+      if (state?.course) {
+        setCourse(state.course);
+        setUserPoints(state.totalPoints);
+      } else {
+        setCourse(null);
+        setUserPoints(0);
+      }
 
       if (user) {
         const dailyMissions = await fetchDailyMissions(user.id);
         setMissions(dailyMissions);
       }
+
+      // TODO: fetch real streak from DB when available
+      setStreak(0);
     } catch (err) {
-      console.error('Error fetching learning state:', err);
+      console.error('Error fetching home state:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleStartLearning = () => {
-    // Navigate to Courses tab
-    navigation.navigate('Courses' as never);
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeLessonId) {
+        // If we have a current course, try to refresh it specifically, otherwise default behavior
+        fetchState(course?.id);
+      }
+    }, [activeLessonId])
+  );
+
+  const handleStartLesson = (lessonId: string) => {
+    setActiveLessonId(lessonId);
   };
 
-  // Get current day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-  const today = new Date().getDay();
+  const handleLessonClose = () => {
+    setActiveLessonId(null);
+    fetchState(course?.id);
+  };
 
-  const days = [
-    { day: 'Mon', active: today === 1 },
-    { day: 'Tue', active: today === 2 },
-    { day: 'Wed', active: today === 3 },
-    { day: 'Thu', active: today === 4 },
-    { day: 'Fri', active: today === 5 },
-    { day: 'Sat', active: today === 6 },
-    { day: 'Sun', active: today === 0 },
-  ];
+  const handleLessonComplete = () => {
+    setActiveLessonId(null);
+    fetchState(course?.id);
+  };
 
-  // Calculate progress percentage
-  const progressPercent = learningState?.progress || 0;
-  const hasProgress = learningState && learningState.completedLessons > 0;
+  const handleCourseSelect = (selectedCourse: Course) => {
+    // Optimistically update course to show loading state or new content immediately
+    setCourse(selectedCourse);
+    // Fetch full state for this course (progress etc)
+    fetchState(selectedCourse.id);
+  };
+
+  const completedMissions = missions.filter((m) => m.is_completed).length;
+
+  if (activeLessonId && course) {
+    return (
+      <LessonScreen
+        lessonId={activeLessonId}
+        courseId={course.id}
+        onClose={handleLessonClose}
+        onComplete={handleLessonComplete}
+      />
+    );
+  }
+
+  if (loading && !course) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (!course) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" backgroundColor={colors.background} />
+        <View style={styles.emptyState}>
+          <Ionicons name="school-outline" size={80} color={colors.text.tertiary} />
+          <Text style={styles.emptyTitle}>Start your journey</Text>
+          <Text style={styles.emptySubtitle}>
+            Choose a course to begin learning and track your progress here.
+          </Text>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={() => setShowCourseModal(true)}
+          >
+            <Text style={styles.startButtonText}>Select a Course</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-      <View style={[styles.contentContainer, { paddingTop: insets.top }]}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
 
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>Hustlingo</Text>
+      {/* Top Stats Bar */}
+      <View style={[styles.statsBar, { paddingTop: insets.top + 8 }]}>
+        {/* Course Image - Clickable */}
+        <TouchableOpacity 
+          style={styles.statItem} 
+          onPress={() => setShowCourseModal(true)}
+          activeOpacity={0.7}
+        >
+          {course.image_url ? (
+            <Image 
+              source={{ uri: course.image_url }} 
+              style={styles.courseImage} 
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={[styles.courseImage, styles.courseImagePlaceholder]}>
+              <Ionicons name="book" size={18} color={colors.text.tertiary} />
             </View>
-            <View style={styles.streakBadge}>
-              <Ionicons name="flash" size={16} color={colors.text.secondary} />
-              <Text style={styles.streakCount}>0</Text>
-            </View>
-          </View>
+          )}
+        </TouchableOpacity>
 
-          {/* Streak Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.streakHeader}>
-              <Ionicons name="flash" size={20} color={colors.text.secondary} />
-              <Text style={styles.streakTitle}>Finish 1 lesson to begin your streak</Text>
-            </View>
-            <View style={styles.daysContainer}>
-              {days.map((item, index) => (
-                <View key={index} style={styles.dayItem}>
-                  <View style={styles.dayIconCircle}>
-                    <Ionicons name="flash" size={16} color={colors.text.tertiary} />
-                  </View>
-                  <Text style={[styles.dayText, item.active && styles.dayTextActive]}>
-                    {item.day}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
+        {/* Streak */}
+        <View style={styles.statItem}>
+          <Image source={require('../../assets/streakIcon.png')} style={styles.streakIcon} />
+          <Text style={styles.statValue}>{streak}</Text>
+        </View>
 
-          {/* Continue learning card */}
-          <Text style={styles.sectionTitle}>
-            {hasProgress ? 'Pick up where you left off' : 'Start your journey'}
+        {/* User Points */}
+        <View style={styles.statItem}>
+          <Text style={styles.pointsIcon}>$</Text>
+          <Text style={styles.statValue}>{userPoints}</Text>
+        </View>
+
+        {/* Daily Missions */}
+        <View style={styles.statItem}>
+          <Ionicons name="checkbox" size={22} color={colors.accent} />
+          <Text style={styles.statValue}>
+            {completedMissions}/{TOTAL_DAILY_MISSIONS}
           </Text>
-
-          <TouchableOpacity style={styles.card} onPress={handleStartLearning} activeOpacity={0.8}>
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.accent} style={{ margin: 16 }} />
-            ) : (
-              <>
-                <View style={styles.cardImageContainer}>
-                  {learningState?.course?.image_url ? (
-                    <Image
-                      source={{ uri: learningState.course.image_url }}
-                      style={styles.cardImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.cardImagePlaceholder}>
-                      <Ionicons name="book" size={24} color={colors.text.tertiary} />
-                    </View>
-                  )}
-                </View>
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle} numberOfLines={1}>
-                    {learningState?.nextLesson?.title || learningState?.course?.title || 'Start learning'}
-                  </Text>
-                  <Text style={styles.cardSubtitle} numberOfLines={1}>
-                    {learningState?.course?.title || 'No course yet'} • {learningState?.completedLessons}/{learningState?.totalLessons} lessons
-                  </Text>
-                </View>
-                <View style={styles.cardButton}>
-                  <Ionicons name="play" size={18} color={colors.background} />
-                </View>
-              </>
-            )}
-          </TouchableOpacity>
-
-          {/* Daily Missions */}
-          <View style={styles.missionsSection}>
-            <View style={styles.missionsHeader}>
-              <View style={styles.missionsHeaderLeft}>
-                <Ionicons name="flag" size={20} color={colors.accent} />
-                <Text style={styles.missionsTitle}>Daily Missions</Text>
-              </View>
-              <Text style={styles.missionsCount}>
-                {missions.filter(m => m.is_completed).length}/{DAILY_MISSIONS.length}
-              </Text>
-            </View>
-
-            {DAILY_MISSIONS.map((mission) => {
-              const userMission = missions.find(m => m.mission_key === mission.key);
-              const isCompleted = userMission?.is_completed ?? false;
-              const progress = userMission?.progress ?? 0;
-
-              return (
-                <View key={mission.key} style={styles.missionRow}>
-                  <View style={[styles.missionCheckbox, isCompleted && styles.missionCheckboxDone]}>
-                    {isCompleted && (
-                      <Ionicons name="checkmark" size={14} color="#fff" />
-                    )}
-                  </View>
-                  <View style={styles.missionInfo}>
-                    <Text style={[styles.missionTitle, isCompleted && styles.missionTitleDone]}>
-                      {mission.title}
-                    </Text>
-                    <Text style={styles.missionProgress}>
-                      {Math.min(progress, mission.target)}/{mission.target}
-                    </Text>
-                  </View>
-                  <View style={styles.missionReward}>
-                    <Ionicons name={mission.icon} size={14} color={colors.accent} />
-                    <Text style={styles.missionRewardText}>+{mission.reward} XP</Text>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-
-        </ScrollView>
+        </View>
       </View>
+
+      {/* Course Path without its own header */}
+      <CoursePathScreen
+        course={course}
+        showBackButton={false}
+        showHeader={false}
+        onStartLesson={handleStartLesson}
+        key={course.id}
+      />
+
+      {/* Course Selection Modal */}
+      <CourseSelectionModal
+        visible={showCourseModal}
+        onClose={() => setShowCourseModal(false)}
+        onSelectCourse={handleCourseSelect}
+        currentCourseId={course.id}
+      />
     </View>
   );
 };
@@ -216,236 +240,86 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  contentContainer: {
-    flex: 1,
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  scrollContent: {
+  statsBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 30,
-  },
-  logoContainer: {
-    backgroundColor: colors.surface, // Or transparent if preferred
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  logoText: {
-    color: colors.text.primary,
-    fontSize: 18,
-    fontFamily: 'Inter_700Bold', // Assuming fonts are loaded in App/Login
-    fontWeight: 'bold',
-  },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  streakCount: {
-    color: colors.text.primary,
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  sectionContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 30,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  streakHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  streakTitle: {
-    color: colors.text.secondary,
-    marginLeft: 8,
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dayItem: {
-    alignItems: 'center',
-  },
-  dayIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
     backgroundColor: colors.background,
-    justifyContent: 'center',
+  },
+  statItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: 6,
   },
-  dayText: {
-    color: colors.text.secondary,
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    fontWeight: '500',
+  streakIcon: {
+    width: 28,
+    height: 28,
+    resizeMode: 'contain',
   },
-  dayTextActive: {
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    fontFamily: 'Inter_700Bold',
+  },
+  pointsIcon: {
+    fontSize: 22,
+    fontWeight: 'bold',
     color: colors.accent,
-  },
-  sectionTitle: {
-    color: colors.text.primary,
-    fontSize: 20,
-    fontWeight: 'bold',
     fontFamily: 'Inter_700Bold',
-    marginBottom: 16,
   },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  courseImage: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+  },
+  courseImagePlaceholder: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
   },
-  cardImageContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: colors.background,
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContent: {
+  emptyState: {
     flex: 1,
-    marginLeft: 12,
-  },
-  cardTitle: {
-    color: colors.text.primary,
-    fontSize: 15,
-    fontWeight: 'bold',
-    fontFamily: 'Inter_700Bold',
-  },
-  cardSubtitle: {
-    color: colors.text.secondary,
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    marginTop: 2,
-  },
-  cardButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
+    paddingHorizontal: 40,
+    gap: 16,
   },
-  missionsSection: {
-    marginTop: 30,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  missionsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  missionsHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  missionsTitle: {
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: colors.text.primary,
+    textAlign: 'center',
+    fontFamily: 'Inter_700Bold',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 24,
+  },
+  startButton: {
+    marginTop: 24,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 16,
+  },
+  startButtonText: {
+    color: colors.background,
     fontSize: 18,
     fontWeight: 'bold',
     fontFamily: 'Inter_700Bold',
-  },
-  missionsCount: {
-    color: colors.text.secondary,
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-  },
-  missionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  missionCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.text.tertiary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  missionCheckboxDone: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  missionInfo: {
-    flex: 1,
-  },
-  missionTitle: {
-    color: colors.text.primary,
-    fontSize: 15,
-    fontFamily: 'Inter_500Medium',
-  },
-  missionTitleDone: {
-    color: colors.text.tertiary,
-    textDecorationLine: 'line-through',
-  },
-  missionProgress: {
-    color: colors.text.secondary,
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    marginTop: 2,
-  },
-  missionReward: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(95, 203, 15, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  missionRewardText: {
-    color: colors.accent,
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'Inter_500Medium',
   },
 });

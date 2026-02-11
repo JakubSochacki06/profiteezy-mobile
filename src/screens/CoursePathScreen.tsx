@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   Dimensions,
   StatusBar,
   ActivityIndicator,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,11 +18,15 @@ import { supabase, getCompletedLessons } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
 const NODE_SIZE = 90;
+const NODE_DEPTH = 8;
 const PADDING = 40;
 const NODE_MARGIN_BOTTOM = 0;
 const CONTAINER_WIDTH = width - (PADDING * 2);
 const CORNER_RADIUS = 20;
 const LINE_WIDTH = 5;
+
+const COMPLETED_SHADOW = '#419702';
+const INCOMPLETE_SHADOW = '#1F2126';
 
 interface Lesson {
   id: string;
@@ -42,13 +48,221 @@ interface Stage {
 
 interface CoursePathScreenProps {
   course: any;
-  onBack: () => void;
+  onBack?: () => void;
   onStartLesson?: (lessonId: string) => void;
+  showBackButton?: boolean;
+  showHeader?: boolean;
 }
 
-export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBack, onStartLesson }) => {
+interface StartIndicatorProps {
+  style?: any;
+}
+
+const StartIndicator: React.FC<StartIndicatorProps> = ({ style }) => {
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -8,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <Animated.View style={[styles.startIndicatorContainer, style, { transform: [{ translateY }] }]}>
+      <View style={styles.startBubble}>
+        <Text style={styles.startText}>START</Text>
+      </View>
+      <View style={styles.arrowContainer}>
+        <View style={styles.startArrowBorder} />
+        <View style={styles.startArrow} />
+      </View>
+    </Animated.View>
+  );
+};
+
+interface LessonNodeProps {
+  lesson: Lesson;
+  isSelected: boolean;
+  onPress: (lesson: Lesson) => void;
+}
+
+const LessonNode: React.FC<LessonNodeProps> = ({ lesson, isSelected, onPress }) => {
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  const handlePressIn = () => {
+    Animated.timing(translateY, {
+      toValue: NODE_DEPTH,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.timing(translateY, {
+      toValue: 0,
+      duration: 100,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const shadowColor = lesson.isCompleted ? COMPLETED_SHADOW : INCOMPLETE_SHADOW;
+  
+  const getFaceStyle = () => {
+    if (lesson.isCompleted) return styles.nodeCompleted;
+    if (lesson.isLocked) return styles.nodeLocked;
+    return styles.nodeActive;
+  };
+
+  return (
+    <Pressable
+      onPress={() => onPress(lesson)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={{
+        height: NODE_SIZE + NODE_DEPTH,
+        width: NODE_SIZE,
+      }}
+    >
+      <View style={styles.nodeBase}>
+        {/* Shadow Layer */}
+        <View style={{
+          position: 'absolute',
+          top: NODE_DEPTH,
+          left: 0,
+          right: 0,
+          height: NODE_SIZE,
+          borderRadius: 20,
+          backgroundColor: shadowColor,
+          shadowColor: "#000",
+          shadowOffset: {
+            width: 0,
+            height: 4,
+          },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+          elevation: 5,
+        }} />
+
+        <Animated.View style={[
+          styles.node,
+          getFaceStyle(),
+          { transform: [{ translateY }] }
+        ]}>
+          <Ionicons 
+            name="book" 
+            size={32} 
+            color={lesson.isLocked ? colors.text.tertiary : colors.text.primary} 
+          />
+        </Animated.View>
+      </View>
+    </Pressable>
+  );
+};
+
+interface LessonPopupProps {
+  lesson: Lesson;
+  isLeft: boolean;
+  isVisible: boolean;
+  onStart: ((id: string) => void) | undefined;
+  onExited?: () => void;
+}
+
+const LessonPopup: React.FC<LessonPopupProps> = ({ lesson, isLeft, isVisible, onStart, onExited }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
+
+  useEffect(() => {
+    if (isVisible) {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 10,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (finished && onExited) {
+          onExited();
+        }
+      });
+    }
+  }, [isVisible]);
+
+  return (
+    <Animated.View 
+      style={[
+        styles.inlinePopup, 
+        isLeft ? styles.popupLeft : styles.popupRight,
+        { opacity, transform: [{ translateY }] }
+      ]}
+      onTouchStart={(e) => e.stopPropagation()}
+    >
+      <View style={[styles.popupArrow, isLeft ? styles.arrowLeft : styles.arrowRight]} />
+      
+      <Text style={styles.popupTitle}>{lesson.title}</Text>
+      <Text style={styles.popupDescription}>{lesson.description || 'No description available'}</Text>
+      {lesson.duration && (
+        <Text style={styles.popupDuration}>{lesson.duration}</Text>
+      )}
+      
+      <View style={styles.popupButtons}>
+        {lesson.isLocked ? (
+          <TouchableOpacity style={[styles.listenButton, styles.lockedButton]} disabled>
+            <Ionicons name="lock-closed-outline" size={20} color="#A1A1AA" />
+            <Text style={[styles.listenButtonText, styles.lockedButtonText]}>Locked</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={styles.listenButton}
+            onPress={() => onStart && onStart(lesson.id)}
+          >
+            <Ionicons name="play-circle-outline" size={20} color={colors.background} />
+            <Text style={styles.listenButtonText}>Start</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </Animated.View>
+  );
+};
+
+export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ 
+  course, 
+  onBack, 
+  onStartLesson,
+  showBackButton = true,
+  showHeader = true 
+}) => {
   const insets = useSafeAreaInsets();
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [exitingLessonId, setExitingLessonId] = useState<string | null>(null);
   
   // Data fetching state
   const [stages, setStages] = useState<Stage[]>([]);
@@ -168,7 +382,26 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
   };
 
   const handleLessonPress = (lesson: Lesson) => {
-    setSelectedLessonId(selectedLessonId === lesson.id ? null : lesson.id);
+    if (selectedLessonId === lesson.id) {
+      setExitingLessonId(lesson.id);
+      setSelectedLessonId(null);
+    } else {
+      if (selectedLessonId) {
+        setExitingLessonId(selectedLessonId);
+      }
+      setSelectedLessonId(lesson.id);
+    }
+  };
+
+  const handleBackgroundPress = () => {
+    if (selectedLessonId) {
+      setExitingLessonId(selectedLessonId);
+      setSelectedLessonId(null);
+    }
+  };
+
+  const handleExited = () => {
+    setExitingLessonId(null);
   };
 
   // Calculate completion rate
@@ -193,7 +426,7 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
                 styles.lessonRow,
                 { 
                   alignItems: isLeft ? 'flex-start' : 'flex-end',
-                  zIndex: selectedLessonId === lesson.id ? 100 : 1
+                  zIndex: (selectedLessonId === lesson.id || exitingLessonId === lesson.id) ? 100 : 1
                 }
               ]}
             >
@@ -236,63 +469,38 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
               )}
 
               {/* Node Wrapper */}
-              <View style={styles.nodeWrapper}>
-                <TouchableOpacity
-                  style={[
-                    styles.node,
-                    lesson.isCompleted ? styles.nodeCompleted : 
-                    lesson.isLocked ? styles.nodeLocked : styles.nodeActive
-                  ]}
-                  onPress={() => handleLessonPress(lesson)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons 
-                    name="book" 
-                    size={32} 
-                    color={lesson.isLocked ? colors.text.tertiary : colors.text.primary} 
-                  />
-                  {lesson.isCompleted && (
-                    <View style={styles.checkBadge}>
-                      <Ionicons name="checkmark" size={14} color={colors.text.primary} />
-                    </View>
-                  )}
-                </TouchableOpacity>
+              <Pressable 
+                style={styles.nodeWrapper}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                {/* START Indicator */}
+                {!lesson.isCompleted && !lesson.isLocked && (
+                  <StartIndicator />
+                )}
+
+                <LessonNode 
+                  lesson={lesson} 
+                  isSelected={selectedLessonId === lesson.id} 
+                  onPress={handleLessonPress} 
+                />
+                
                 <Text style={[
                   styles.nodeTitle,
                   lesson.isLocked && styles.nodeTitleLocked
                 ]} numberOfLines={2}>
                   {lesson.title}
                 </Text>
-              </View>
+              </Pressable>
 
               {/* Inline Popup */}
-              {selectedLessonId === lesson.id && (
-                <View style={[styles.inlinePopup, isLeft ? styles.popupLeft : styles.popupRight]}>
-                  <View style={[styles.popupArrow, isLeft ? styles.arrowLeft : styles.arrowRight]} />
-                  
-                  <Text style={styles.popupTitle}>{lesson.title}</Text>
-                  <Text style={styles.popupDescription}>{lesson.description || 'No description available'}</Text>
-                  {lesson.duration && (
-                    <Text style={styles.popupDuration}>{lesson.duration}</Text>
-                  )}
-                  
-                  <View style={styles.popupButtons}>
-                    {lesson.isLocked ? (
-                      <TouchableOpacity style={[styles.listenButton, styles.lockedButton]} disabled>
-                        <Ionicons name="lock-closed-outline" size={20} color="#A1A1AA" />
-                        <Text style={[styles.listenButtonText, styles.lockedButtonText]}>Locked</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity 
-                        style={styles.listenButton}
-                        onPress={() => onStartLesson && onStartLesson(lesson.id)}
-                      >
-                        <Ionicons name="play-circle-outline" size={20} color={colors.background} />
-                        <Text style={styles.listenButtonText}>Start</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
+              {(selectedLessonId === lesson.id || exitingLessonId === lesson.id) && (
+                <LessonPopup 
+                  lesson={lesson} 
+                  isLeft={isLeft} 
+                  isVisible={selectedLessonId === lesson.id}
+                  onStart={onStartLesson} 
+                  onExited={handleExited}
+                />
               )}
             </View>
           );
@@ -306,9 +514,11 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-          </TouchableOpacity>
+          {showBackButton && (
+            <TouchableOpacity onPress={onBack} style={styles.backButton}>
+              <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          )}
           <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -324,9 +534,11 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
         <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-          </TouchableOpacity>
+          {showBackButton && (
+            <TouchableOpacity onPress={onBack} style={styles.backButton}>
+              <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          )}
           <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
         </View>
         <View style={styles.errorContainer}>
@@ -346,16 +558,20 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
 
       {/* Sticky Header */}
-      <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
-        <View style={styles.completionBadge}>
-          <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
-          <Text style={styles.completionText}>{completionRate}%</Text>
+      {showHeader && (
+        <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
+          {showBackButton && (
+            <TouchableOpacity onPress={onBack} style={styles.backButton}>
+              <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
+          <View style={styles.completionBadge}>
+            <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
+            <Text style={styles.completionText}>{completionRate}%</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Path Content */}
       <View style={{flex: 1}}>
@@ -370,6 +586,7 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
+            onTouchStart={handleBackgroundPress}
           >
             {/* Subtle $ pattern — scrolls with content */}
             {(() => {
@@ -407,17 +624,17 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({ course, onBa
               <View key={stage.id} style={styles.chapterContainer}>
                 {/* Stage Header */}
                 <View style={styles.chapterHeader}>
+                  <View style={styles.chapterBadge}>
+                    <Text style={styles.chapterBadgeText}>
+                      STAGE {stageIndex + 1} • {stage.lessons.length} LESSONS
+                    </Text>
+                  </View>
                   <Text style={styles.chapterTitle}>{stage.title}</Text>
                   {stage.description && (
                     <Text style={styles.chapterDescription} numberOfLines={2}>
                       {stage.description}
                     </Text>
                   )}
-                  <View style={styles.chapterBadge}>
-                    <Text style={styles.chapterBadgeText}>
-                      STAGE {stageIndex + 1} • {stage.lessons.length} LESSONS
-                    </Text>
-                  </View>
                 </View>
 
                 {/* Lessons Path */}
@@ -488,17 +705,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
   },
   scrollContent: {
-    paddingVertical: 24,
+    paddingVertical: 16,
   },
   chapterContainer: {
-    marginBottom: 40,
+    marginBottom: 24,
   },
   chapterHeader: {
     backgroundColor: colors.surface,
     marginHorizontal: 20,
-    padding: 16,
+    padding: 14,
     borderRadius: 16,
-    marginBottom: 24,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
     shadowColor: "#000",
@@ -512,7 +729,7 @@ const styles = StyleSheet.create({
   },
   chapterBadge: {
     alignSelf: 'flex-start',
-    marginTop: 8,
+    marginBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(95, 203, 15, 0.1)',
@@ -559,6 +776,11 @@ const styles = StyleSheet.create({
     width: 120,
     zIndex: 2,
   },
+  nodeBase: {
+    width: NODE_SIZE,
+    height: NODE_SIZE + NODE_DEPTH,
+    borderRadius: 20,
+  },
   node: {
     width: NODE_SIZE,
     height: NODE_SIZE,
@@ -566,14 +788,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
     backgroundColor: colors.background,
   },
   nodeActive: {
@@ -639,7 +853,7 @@ const styles = StyleSheet.create({
   },
   inlinePopup: {
     position: 'absolute',
-    top: NODE_SIZE - 15,
+    top: NODE_SIZE + NODE_DEPTH,
     width: CONTAINER_WIDTH,
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -795,5 +1009,66 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     textAlign: 'center',
     paddingHorizontal: PADDING,
+  },
+  startIndicatorContainer: {
+    position: 'absolute',
+    top: -28, // Overlaps the button slightly
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  startBubble: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.background,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 6,
+    marginBottom: -1,
+  },
+  startText: {
+    color: colors.background,
+    fontSize: 12,
+    fontWeight: '800',
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 1,
+  },
+  arrowContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -1,
+  },
+  startArrowBorder: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 10,
+    borderRightWidth: 10,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: colors.background,
+  },
+  startArrow: {
+    position: 'absolute',
+    top: 0,
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 8,
+    borderRightWidth: 8,
+    borderTopWidth: 8,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderTopColor: colors.accent,
   },
 });

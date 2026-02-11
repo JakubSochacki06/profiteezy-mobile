@@ -103,7 +103,7 @@ export const ProfileScreen = () => {
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <View style={styles.statIconContainer}>
-              <Ionicons name="flame" size={24} color="#60A5FA" />
+              <Image source={require('../../assets/streakIcon.png')} style={styles.streakIcon} />
             </View>
             <Text style={styles.statValue}>0</Text>
             <Text style={styles.statLabel}>DAYS STREAK</Text>
@@ -306,6 +306,11 @@ const styles = StyleSheet.create({
   },
   statIconContainer: {
     marginBottom: 8,
+  },
+  streakIcon: {
+    width: 24,
+    height: 24,
+    resizeMode: 'contain',
   },
   statValue: {
     color: colors.text.primary,

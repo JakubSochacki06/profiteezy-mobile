@@ -188,6 +188,29 @@ export async function upsertProfile(profile: Omit<Profile, 'created_at' | 'updat
   }
 }
 
+/**
+ * Get user's total points from all completed lessons
+ */
+export async function getUserTotalPoints(userId: string): Promise<number> {
+  try {
+    const { data, error } = await supabase
+      .from('user_lesson_progress')
+      .select('points_earned')
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error('Error fetching user total points:', error);
+      return 0;
+    }
+
+    const totalPoints = data?.reduce((acc, curr) => acc + (curr.points_earned || 0), 0) || 0;
+    return totalPoints;
+  } catch (err) {
+    console.error('Error in getUserTotalPoints:', err);
+    return 0;
+  }
+}
+
 // ===== Progress Helper Functions =====
 
 /**
@@ -364,28 +387,46 @@ export async function getNextLesson(courseId: string): Promise<Lesson | null> {
 /**
  * Get the user's current learning state for the home screen
  */
-export async function getCurrentLearningState(): Promise<{
+export async function getCurrentLearningState(courseId?: string): Promise<{
   course: Course | null;
   nextLesson: Lesson | null;
   progress: number;
   completedLessons: number;
   totalLessons: number;
+  totalPoints: number;
 } | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Get the first live course (or the course user has started)
-    const { data: courses, error: courseError } = await supabase
-      .from('courses')
-      .select('*')
-      .eq('is_live', true)
-      .limit(1);
+    let course: Course | null = null;
 
-    if (courseError || !courses || courses.length === 0) return null;
+    if (courseId) {
+       const { data: specificCourse, error } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('id', courseId)
+        .single();
+        
+       if (!error && specificCourse) {
+         course = specificCourse as Course;
+       }
+    }
 
-    const course = courses[0] as Course;
+    if (!course) {
+      // Get the first live course (fallback)
+      const { data: courses, error: courseError } = await supabase
+        .from('courses')
+        .select('*')
+        .eq('is_live', true)
+        .limit(1);
+
+      if (courseError || !courses || courses.length === 0) return null;
+      course = courses[0] as Course;
+    }
+
     const courseProgress = await getCourseProgress(course.id);
     const nextLesson = await getNextLesson(course.id);
+    const totalPoints = user ? await getUserTotalPoints(user.id) : 0;
 
     return {
       course,
@@ -393,6 +434,7 @@ export async function getCurrentLearningState(): Promise<{
       progress: courseProgress.percentage,
       completedLessons: courseProgress.completedCount,
       totalLessons: courseProgress.totalCount,
+      totalPoints,
     };
   } catch (err) {
     console.error('Error in getCurrentLearningState:', err);
