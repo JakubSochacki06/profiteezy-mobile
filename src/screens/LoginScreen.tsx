@@ -21,9 +21,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { colors } from '../theme/colors';
 import { QuestionnaireNavigator, questionnaireData, QuestionnaireResult } from '../questionnaire';
-import { usePaywall } from '../hooks/usePaywall';
 import { MainTabNavigator } from '../navigation';
-import { CreateAccountScreen } from './CreateAccountScreen';
+import { Button } from '../components/Button';
+import { LoadingScreen } from '../components/LoadingScreen';
 import {
   GoogleSignin,
   isSuccessResponse,
@@ -66,13 +66,65 @@ export const LoginScreen = () => {
   const [showQuestionnaire, setShowQuestionnaire] = useState(false);
   const [questionnaireStartIndex, setQuestionnaireStartIndex] = useState<number | undefined>(undefined);
   const [showHome, setShowHome] = useState(false);
-  const [showCreateAccount, setShowCreateAccount] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(height)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Check if user is already signed in and has an active subscription
+  useEffect(() => {
+    const checkAuthAndSubscription = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session?.user) {
+          // User is signed in — check subscription status in profiles table
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('subscription_status, subscription_expires_at')
+            .eq('id', session.user.id)
+            .single();
+
+          if (!error && profile) {
+            const isActive = profile.subscription_status === 'active';
+            const isExpired = profile.subscription_expires_at
+              ? new Date(profile.subscription_expires_at) < new Date()
+              : false;
+
+            if (isActive && !isExpired) {
+              // Active subscription — go straight to home
+              console.log('User has active subscription, skipping to home');
+              setShowHome(true);
+              setIsCheckingAuth(false);
+              return;
+            }
+
+            // Subscription is inactive or expired — update status if expired
+            if (isActive && isExpired) {
+              console.log('Subscription expired, updating status');
+              await supabase
+                .from('profiles')
+                .update({ subscription_status: 'inactive', updated_at: new Date().toISOString() })
+                .eq('id', session.user.id);
+            }
+          }
+
+          // User is signed in but no active subscription — sign out and show start of app
+          console.log('User signed in but subscription inactive/expired, signing out and showing start');
+          await supabase.auth.signOut();
+        }
+      } catch (err) {
+        console.error('Error checking auth/subscription:', err);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkAuthAndSubscription();
+  }, []);
 
   useEffect(() => {
     if (showSignInModal) {
@@ -114,20 +166,6 @@ export const LoginScreen = () => {
     });
   };
 
-  const { showPaywall } = usePaywall({
-    placement: 'onboarding_complete',
-    onDismiss: (result) => {
-      if (result.type === 'purchased' || result.type === 'restored') {
-        setShowCreateAccount(true);
-        setShowQuestionnaire(false);
-      }
-    },
-    onSkip: () => {
-      setShowHome(true);
-      setShowQuestionnaire(false);
-    },
-  });
-
   const handleGetStarted = () => {
     setQuestionnaireStartIndex(undefined);
     setShowQuestionnaire(true);
@@ -140,7 +178,8 @@ export const LoginScreen = () => {
 
   const handleQuestionnaireComplete = (results: QuestionnaireResult) => {
     console.log('Questionnaire completed with results:', results);
-    showPaywall();
+    setShowHome(true);
+    setShowQuestionnaire(false);
   };
 
   const handleSignIn = () => {
@@ -286,25 +325,13 @@ export const LoginScreen = () => {
     };
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return null; // Or a loading screen
+  if (!fontsLoaded || isCheckingAuth) {
+    return <LoadingScreen />;
   }
 
   // Show Main Tab Navigator if user has completed onboarding and paywall
   if (showHome) {
     return <MainTabNavigator />;
-  }
-
-  // Show Create Account screen after successful paywall purchase
-  if (showCreateAccount) {
-    return (
-      <CreateAccountScreen
-        onComplete={() => {
-          setShowHome(true);
-          setShowCreateAccount(false);
-        }}
-      />
-    );
   }
 
   // Show questionnaire if user clicked Get Started
@@ -351,13 +378,7 @@ export const LoginScreen = () => {
           >
             <Text style={styles.debugButtonText}>⏭️</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setShowCreateAccount(true)}
-            style={styles.debugButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.debugButtonText}>👤</Text>
-          </TouchableOpacity>
+          {/* CreateAccount debug button removed - sign-in is now in questionnaire */}
         </View>
 
         {/* Concentric Circles with Dollar Sign */}
@@ -416,13 +437,15 @@ export const LoginScreen = () => {
         <View style={[styles.bottomContainer, { paddingBottom: 28 + insets.bottom }]}>
           <View style={styles.bottomContent}>
             {/* Get Started Button */}
-            <TouchableOpacity
-              style={styles.getStartedButton}
-              onPress={handleGetStarted}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.getStartedText}>Get started</Text>
-            </TouchableOpacity>
+            <View style={{ width: '100%', marginBottom: 16 }}>
+              <Button
+                title="Get started"
+                onPress={handleGetStarted}
+                variant="primary"
+                size="large"
+                fullWidth
+              />
+            </View>
 
             {/* Sign In Link */}
             <TouchableOpacity
@@ -635,19 +658,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     color: colors.accent,
   },
-  getStartedButton: {
-    backgroundColor: colors.accent,
-    width: '100%',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  getStartedText: {
-    color: colors.background,
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  // getStartedButton styles removed - now using Button component
   signInText: {
     color: colors.text.secondary,
     fontSize: 15,

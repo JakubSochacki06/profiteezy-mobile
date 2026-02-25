@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { colors } from '../../theme/colors';
+import { Button } from '../../components/Button';
 
 interface QuestionnaireButtonProps {
   onPress: () => void;
@@ -15,14 +16,14 @@ export const QuestionnaireButton: React.FC<QuestionnaireButtonProps> = ({
 }) => {
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={[styles.button, disabled && styles.buttonDisabled]}
+      <Button
+        title={text}
         onPress={onPress}
         disabled={disabled}
-        activeOpacity={0.9}
-      >
-        <Text style={styles.buttonText}>{text}</Text>
-      </TouchableOpacity>
+        variant="primary"
+        size="large"
+        fullWidth
+      />
     </View>
   );
 };
@@ -35,19 +36,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-  },
-  button: {
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#FFFFFF',
   },
 });

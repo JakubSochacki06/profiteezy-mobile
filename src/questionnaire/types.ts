@@ -80,12 +80,19 @@ export interface PersonalPlanScreenData {
   reviews: ReviewData[];
 }
 
+export interface SignInScreenData {
+  type: 'sign_in';
+  title?: string;
+  subtitle?: string;
+}
+
 export type QuestionnaireStep =
   | Question
   | ImageScreenData
   | InputScreenData
   | MoneyMakingProbabilityResultData
-  | PersonalPlanScreenData;
+  | PersonalPlanScreenData
+  | SignInScreenData;
 
 export interface QuestionnaireData {
   welcome: WelcomeScreenData;

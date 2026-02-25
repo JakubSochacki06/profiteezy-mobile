@@ -6,6 +6,7 @@ import { ImageScreen } from './screens/ImageScreen';
 import { InputScreen } from './screens/InputScreen';
 import { ReadinessScoreScreen } from './screens/ReadinessScoreScreen';
 import { PersonalPlanScreen } from './screens/PersonalPlanScreen';
+import { SignInScreen } from './screens/SignInScreen';
 
 interface QuestionnaireNavigatorProps {
   data: QuestionnaireData;
@@ -151,6 +152,20 @@ export const QuestionnaireNavigator: React.FC<QuestionnaireNavigatorProps> = ({
   if (currentStep.type === 'personal_plan') {
     return (
       <PersonalPlanScreen
+        key={currentIndex}
+        data={currentStep}
+        onBack={handleQuestionBack}
+        currentStep={currentIndex + 1}
+        totalSteps={totalSteps}
+        onContinue={handleImageContinue}
+      />
+    );
+  }
+
+  // Check if it's a sign-in screen
+  if (currentStep.type === 'sign_in') {
+    return (
+      <SignInScreen
         key={currentIndex}
         data={currentStep}
         onBack={handleQuestionBack}

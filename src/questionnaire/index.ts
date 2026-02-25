@@ -9,6 +9,7 @@ export type {
   Question,
   Answer,
   WelcomeScreenData,
+  SignInScreenData,
   QuestionnaireData,
   QuestionnaireResult,
 } from './types';

@@ -3,3 +3,4 @@ export { QuestionScreen } from './QuestionScreen';
 export { ImageScreen } from './ImageScreen';
 export { InputScreen } from './InputScreen';
 export { ReadinessScoreScreen } from './ReadinessScoreScreen';
+export { SignInScreen } from './SignInScreen';

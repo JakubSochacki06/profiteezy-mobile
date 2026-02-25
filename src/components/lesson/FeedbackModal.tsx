@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, Animated as RNAnimated, Pressable, Image } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -21,6 +21,78 @@ interface FeedbackModalProps {
   points?: number;
 }
 
+// Constants for 3D button effect
+const BUTTON_DEPTH = 5;
+const PRIMARY_SHADOW_SUCCESS = '#419702'; // Darker green
+const PRIMARY_SHADOW_ERROR = '#B91C1C'; // Darker red
+const SECONDARY_SHADOW = '#1F2126'; // Dark shadow
+
+// 3D Button component for modal
+interface Button3DProps {
+  title: string;
+  onPress: () => void;
+  backgroundColor: string;
+  shadowColor: string;
+  textColor: string;
+  flex?: number;
+  borderColor?: string;
+}
+
+const Button3D: React.FC<Button3DProps> = ({ 
+  title, 
+  onPress, 
+  backgroundColor, 
+  shadowColor, 
+  textColor,
+  flex = 1,
+  borderColor,
+}) => {
+  const translateY = useRef(new RNAnimated.Value(0)).current;
+
+  const handlePressIn = () => {
+    RNAnimated.timing(translateY, {
+      toValue: BUTTON_DEPTH,
+      duration: 80,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    RNAnimated.timing(translateY, {
+      toValue: 0,
+      duration: 80,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      style={[styles.button3dContainer, { flex }, flex === 0 && { minWidth: 80 }]}
+    >
+      {/* Shadow layer */}
+      <View style={[styles.button3dShadow, { backgroundColor: shadowColor }]} />
+      
+      {/* Face layer */}
+      <RNAnimated.View 
+        style={[
+          styles.button3dFace, 
+          { 
+            backgroundColor,
+            borderColor: borderColor,
+            borderWidth: borderColor ? 1 : 0,
+            transform: [{ translateY }] 
+          }
+        ]}
+      >
+        <Text style={[styles.button3dText, { color: textColor }]}>{title}</Text>
+      </RNAnimated.View>
+    </Pressable>
+  );
+};
+
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   isVisible,
   isCorrect,
@@ -31,9 +103,15 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(300); // Start off-screen
+  
+  // Freeze the isCorrect value when modal becomes visible
+  // This prevents showing "Incorrect" during close animation when state resets
+  const [frozenIsCorrect, setFrozenIsCorrect] = useState(isCorrect);
 
   useEffect(() => {
     if (isVisible) {
+      // Capture the correct state when modal opens
+      setFrozenIsCorrect(isCorrect);
       // Subtle push from bottom
       translateY.value = withTiming(0, {
         duration: 300,
@@ -45,7 +123,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
         easing: Easing.in(Easing.cubic),
       });
     }
-  }, [isVisible]);
+  }, [isVisible, isCorrect]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -55,29 +133,19 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   if (!isVisible && translateY.value === 300) return null;
 
-  // Design tokens
-  const isSuccess = isCorrect;
+  // Use frozen value to prevent flicker during close animation
+  const isSuccess = frozenIsCorrect;
   
   // Background is always surface color to fit dark theme
   const backgroundColor = colors.surface;
   
   // Status Colors (for text and icons)
-  const statusColor = isSuccess ? colors.success : colors.error;
+  const statusColor = isSuccess ? '#FFFFFF' : colors.error;
   
-  // Button Colors
-  // Primary Action: Always Accent color for consistency, or Error color for "Try Again"?
-  // Usually "Try Again" is also a primary action, but using Accent everywhere keeps it cohesive.
-  // However, "Try Again" in red might be clearer. Let's stick to the user request: "make the continue button accent".
-  // I'll make the primary button Accent for success, and maybe keep it Accent or Error for retry. 
-  // Let's try Accent for both to keep the "theme" request, or maybe Error for retry to signal state.
-  // User said "make the continue button accent", implies Success state. 
-  // For consistency, let's use Accent for success, and Error for Retry to clearly distinguish.
+  // Button colors for 3D effect
   const buttonBg = isSuccess ? colors.accent : (canRetry ? colors.error : colors.accent);
-  const buttonText = '#FFFFFF'; // White text on colored buttons
-  
-  // Secondary Button (Why?)
-  const secondaryBorder = colors.border;
-  const secondaryText = colors.text.secondary;
+  const buttonShadow = isSuccess ? PRIMARY_SHADOW_SUCCESS : (canRetry ? PRIMARY_SHADOW_ERROR : PRIMARY_SHADOW_SUCCESS);
+  const buttonText = '#FFFFFF';
 
   return (
     <Animated.View style={[
@@ -90,11 +158,19 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
     ]}>
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Ionicons 
-            name={isSuccess ? "checkmark-circle" : "close-circle"} 
-            size={32} 
-            color={statusColor} 
-          />
+          {isSuccess ? (
+            <Image 
+              source={require('../../../assets/confetti-icon.png')}
+              style={{ width: 32, height: 32 }}
+              resizeMode="contain"
+            />
+          ) : (
+            <Ionicons 
+              name="close-circle" 
+              size={32} 
+              color={statusColor} 
+            />
+          )}
           <Text style={[styles.title, { color: statusColor }]}>
             {isSuccess ? "Correct!" : "Incorrect"}
           </Text>
@@ -107,26 +183,20 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
           </View>
         )}
         
-        <TouchableOpacity style={styles.flagButton}>
+        <Pressable style={styles.flagButton}>
           <Ionicons name="flag-outline" size={20} color={colors.text.tertiary} />
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       <View style={styles.actions}>
-        {/* Placeholder for explanation/Why button */}
-        <TouchableOpacity style={[styles.secondaryButton, { borderColor: secondaryBorder }]}>
-          <Text style={[styles.secondaryButtonText, { color: secondaryText }]}>Why?</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={[styles.primaryButton, { backgroundColor: buttonBg }]}
+        {/* Primary action button with 3D effect */}
+        <Button3D
+          title={isSuccess || !canRetry ? "Continue" : "Try Again"}
           onPress={isSuccess || !canRetry ? onNext : onRetry}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.primaryButtonText, { color: buttonText }]}>
-            {isSuccess || !canRetry ? "Continue" : "Try Again"}
-          </Text>
-        </TouchableOpacity>
+          backgroundColor={buttonBg}
+          shadowColor={buttonShadow}
+          textColor={buttonText}
+        />
       </View>
     </Animated.View>
   );
@@ -185,34 +255,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  primaryButton: {
-    flex: 1,
+  // 3D Button styles
+  button3dContainer: {
+    height: 56 + BUTTON_DEPTH,
+    position: 'relative',
+  },
+  button3dShadow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: BUTTON_DEPTH,
+    height: 56,
+    borderRadius: 16,
+  },
+  button3dFace: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
     height: 56,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingHorizontal: 24,
   },
-  primaryButtonText: {
+  button3dText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    fontFamily: 'Inter_700Bold',
-  },
-  secondaryButton: {
-    width: 80,
-    height: 56,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    backgroundColor: 'transparent',
-  },
-  secondaryButtonText: {
-    fontSize: 16,
     fontWeight: 'bold',
     fontFamily: 'Inter_700Bold',
   },

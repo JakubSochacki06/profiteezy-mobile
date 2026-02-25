@@ -13,14 +13,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { Card } from '../components/Card';
-import { Button } from '../components/Button';
-import { supabase } from '../lib/supabase';
+import { supabase, getUserTotalPoints, fetchStreak } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
+
+const LEAGUE_IMAGE = require('../../assets/leagues/League1.png');
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [totalXp, setTotalXp] = useState(0);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
 
   useEffect(() => {
     fetchProfile();
@@ -30,6 +34,15 @@ export const ProfileScreen = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      if (user) {
+        const [xp, streakData] = await Promise.all([
+          getUserTotalPoints(user.id),
+          fetchStreak(user.id),
+        ]);
+        setTotalXp(xp);
+        setCurrentStreak(streakData.current_streak);
+        setLongestStreak(streakData.longest_streak);
+      }
     } catch (error) {
       console.error('Error fetching user:', error);
     } finally {
@@ -37,12 +50,25 @@ export const ProfileScreen = () => {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error) {
-      Alert.alert('Error', 'Failed to sign out');
-    }
+  const handleSignOut = () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await supabase.auth.signOut();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to sign out');
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -52,7 +78,7 @@ export const ProfileScreen = () => {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.settingsButton} onPress={handleSignOut}>
+        <TouchableOpacity style={styles.settingsButton}>
           <Ionicons name="settings-outline" size={24} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
@@ -87,25 +113,13 @@ export const ProfileScreen = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Pro CTA */}
-        <View style={styles.ctaSection}>
-          <Button
-            title="Try pro for free"
-            onPress={() => { }}
-            variant="primary"
-            fullWidth
-            style={styles.proButton}
-            textStyle={styles.proButtonText}
-          />
-        </View>
-
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <View style={styles.statIconContainer}>
               <Image source={require('../../assets/streakIcon.png')} style={styles.streakIcon} />
             </View>
-            <Text style={styles.statValue}>0</Text>
+            <Text style={styles.statValue}>{currentStreak}</Text>
             <Text style={styles.statLabel}>DAYS STREAK</Text>
           </View>
 
@@ -113,25 +127,28 @@ export const ProfileScreen = () => {
             <View style={styles.statIconContainer}>
               <Ionicons name="flash" size={24} color="#F59E0B" />
             </View>
-            <Text style={styles.statValue}>1 870</Text>
+            <Text style={styles.statValue}>{totalXp.toLocaleString()}</Text>
             <Text style={styles.statLabel}>XP</Text>
           </View>
 
           <View style={styles.statCard}>
             <View style={styles.statIconContainer}>
-              <Ionicons name="trophy" size={24} color="#E879F9" />
+              <Image source={LEAGUE_IMAGE} style={styles.leagueIcon} />
             </View>
             <Text style={styles.statValue}>Stone</Text>
             <Text style={styles.statLabel}>LEAGUE</Text>
           </View>
         </View>
 
-        {/* Share Progress */}
-        <View style={styles.shareSection}>
-          <TouchableOpacity style={styles.shareProgressButton} activeOpacity={0.7}>
-            <Ionicons name="share-social-outline" size={20} color={colors.text.primary} style={{ marginRight: 8 }} />
-            <Text style={styles.shareProgressText}>Share my progress</Text>
-          </TouchableOpacity>
+        {/* Invite Banner */}
+        <View style={styles.inviteBanner}>
+          <View style={styles.inviteIconContainer}>
+            <Image source={require('../../assets/present.png')} style={styles.presentIcon} />
+          </View>
+          <View style={styles.inviteContent}>
+            <Text style={styles.inviteTitle}>Get 2 weeks of Hustlingo Pro for every friend you invite!</Text>
+            <Text style={styles.inviteLink}>Invite friends</Text>
+          </View>
         </View>
 
         {/* Friends Section */}
@@ -174,16 +191,11 @@ export const ProfileScreen = () => {
           </Card>
         </View>
 
-        {/* Invite Banner */}
-        <View style={styles.inviteBanner}>
-          <View style={styles.inviteIconContainer}>
-            <Ionicons name="gift" size={32} color="#EF4444" />
-          </View>
-          <View style={styles.inviteContent}>
-            <Text style={styles.inviteTitle}>Get 2 weeks of Pro for every friend</Text>
-            <Text style={styles.inviteLink}>Invite friends</Text>
-          </View>
-        </View>
+        {/* Log Out Button */}
+        <TouchableOpacity style={styles.logOutButton} onPress={handleSignOut}>
+          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <Text style={styles.logOutText}>Log Out</Text>
+        </TouchableOpacity>
 
       </ScrollView>
     </View>
@@ -270,18 +282,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: 'Inter_500Medium',
   },
-  ctaSection: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-  },
-  proButton: {
-    borderRadius: 16,
-    height: 56,
-  },
-  proButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   statsGrid: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -312,6 +312,11 @@ const styles = StyleSheet.create({
     height: 24,
     resizeMode: 'contain',
   },
+  leagueIcon: {
+    width: 28,
+    height: 28,
+    resizeMode: 'contain',
+  },
   statValue: {
     color: colors.text.primary,
     fontSize: 18,
@@ -326,26 +331,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontFamily: 'Inter_700Bold',
     textAlign: 'center',
-  },
-  shareSection: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  shareProgressButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderWidth: 2,
-    borderColor: colors.text.primary,
-    borderRadius: 16,
-  },
-  shareProgressText: {
-    color: colors.text.primary,
-    fontSize: 16,
-    fontWeight: 'bold',
-    fontFamily: 'Inter_700Bold',
   },
   friendsSection: {
     paddingHorizontal: 20,
@@ -427,17 +412,39 @@ const styles = StyleSheet.create({
   inviteContent: {
     flex: 1,
   },
+  presentIcon: {
+    width: 40,
+    height: 40,
+    resizeMode: 'contain',
+  },
   inviteTitle: {
-    color: colors.text.primary,
+    color: colors.text.secondary,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     marginBottom: 4,
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'Inter_500Medium',
   },
   inviteLink: {
     color: colors.text.primary,
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
     fontFamily: 'Inter_700Bold',
+  },
+  logOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    gap: 8,
+  },
+  logOutText: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
   },
 });

@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   TouchableOpacity,
   StatusBar,
   Image,
@@ -14,18 +13,18 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import {
-  getCurrentLearningState,
   Course,
   supabase,
   fetchDailyMissions,
+  getUserTotalPoints,
+  fetchStreak,
   UserDailyMission,
+  TOTAL_DAILY_MISSIONS,
 } from '../lib/supabase';
 import { CoursePathScreen } from './CoursePathScreen';
 import { LessonScreen } from './LessonScreen';
-import { CourseSelectionModal } from '../components';
+import { CourseSelectionModal, Button, LoadingScreen } from '../components';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-
-const TOTAL_DAILY_MISSIONS = 2;
 
 export const HomeScreen = () => {
   const insets = useSafeAreaInsets();
@@ -70,26 +69,53 @@ export const HomeScreen = () => {
     try {
       if (!course) setLoading(true);
 
-      const [state, { data: { user } }] = await Promise.all([
-        getCurrentLearningState(courseId),
-        supabase.auth.getUser(),
-      ]);
+      // Step 1: Get user + course in parallel (fast — just 2 small queries)
+      const { data: { user } } = await supabase.auth.getUser();
 
-      if (state?.course) {
-        setCourse(state.course);
-        setUserPoints(state.totalPoints);
+      let courseData: Course | null = null;
+      if (courseId) {
+        const { data } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('id', courseId)
+          .single();
+        if (data) courseData = data as Course;
+      }
+      if (!courseData) {
+        const { data: courses } = await supabase
+          .from('courses')
+          .select('*')
+          .eq('is_live', true)
+          .limit(1);
+        if (courses?.length) courseData = courses[0] as Course;
+      }
+
+      // Set course immediately so CoursePathScreen starts loading right away
+      if (courseData) {
+        setCourse(courseData);
       } else {
         setCourse(null);
         setUserPoints(0);
       }
 
-      if (user) {
-        const dailyMissions = await fetchDailyMissions(user.id);
+      // Step 2: Fetch points, missions, and streak in parallel (doesn't block the course path)
+      if (user && courseData) {
+        const [points, dailyMissions, streakData] = await Promise.all([
+          getUserTotalPoints(user.id),
+          fetchDailyMissions(user.id),
+          fetchStreak(user.id),
+        ]);
+        setUserPoints(points);
         setMissions(dailyMissions);
+        setStreak(streakData.current_streak);
+      } else if (user) {
+        const [dailyMissions, streakData] = await Promise.all([
+          fetchDailyMissions(user.id),
+          fetchStreak(user.id),
+        ]);
+        setMissions(dailyMissions);
+        setStreak(streakData.current_streak);
       }
-
-      // TODO: fetch real streak from DB when available
-      setStreak(0);
     } catch (err) {
       console.error('Error fetching home state:', err);
     } finally {
@@ -141,11 +167,7 @@ export const HomeScreen = () => {
   }
 
   if (loading && !course) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={colors.accent} />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   if (!course) {
@@ -158,12 +180,11 @@ export const HomeScreen = () => {
           <Text style={styles.emptySubtitle}>
             Choose a course to begin learning and track your progress here.
           </Text>
-          <TouchableOpacity
-            style={styles.startButton}
+          <Button
+            title="Select a Course"
             onPress={() => setShowCourseModal(true)}
-          >
-            <Text style={styles.startButtonText}>Select a Course</Text>
-          </TouchableOpacity>
+            size="large"
+          />
         </View>
       </View>
     );
@@ -208,7 +229,10 @@ export const HomeScreen = () => {
 
         {/* Daily Missions */}
         <View style={styles.statItem}>
-          <Ionicons name="checkbox" size={22} color={colors.accent} />
+          <View style={styles.checkmarkContainer}>
+            <Ionicons name="checkmark" size={22} color={colors.accent} style={styles.checkmarkIcon} />
+            <Ionicons name="checkmark" size={22} color={colors.accent} style={styles.checkmarkIconBold} />
+          </View>
           <Text style={styles.statValue}>
             {completedMissions}/{TOTAL_DAILY_MISSIONS}
           </Text>
@@ -239,10 +263,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  center: {
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   statsBar: {
     flexDirection: 'row',
@@ -275,6 +295,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.accent,
     fontFamily: 'Inter_700Bold',
+  },
+  checkmarkContainer: {
+    position: 'relative',
+    width: 22,
+    height: 22,
+  },
+  checkmarkIcon: {
+    position: 'absolute',
+  },
+  checkmarkIconBold: {
+    position: 'absolute',
+    left: 0.5,
+    top: 0.5,
   },
   courseImage: {
     width: 28,
@@ -309,17 +342,5 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     lineHeight: 24,
   },
-  startButton: {
-    marginTop: 24,
-    backgroundColor: colors.accent,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 16,
-  },
-  startButtonText: {
-    color: colors.background,
-    fontSize: 18,
-    fontWeight: 'bold',
-    fontFamily: 'Inter_700Bold',
-  },
+  // startButton styles removed - now using Button component
 });

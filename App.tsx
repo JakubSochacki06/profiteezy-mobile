@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { SuperwallProvider, useSuperwall } from 'expo-superwall';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { supabase } from './src/lib/supabase';
 
 // Component to handle deep links and subscription status initialization
 // Note: The SDK may handle some deep links automatically, but we set this up
@@ -12,15 +13,41 @@ function DeepLinkHandler() {
   const superwall = useSuperwall();
 
   useEffect(() => {
-    // Initialize subscription status to INACTIVE for new users
-    // This prevents the "unknown" status timeout error (SWKPresentationError: 105)
-    // The status should be updated to ACTIVE when the user makes a purchase
+    // Initialize Superwall subscription status from Supabase profile.
+    // This avoids resetting paid users back to INACTIVE on every app launch.
     const initializeSubscriptionStatus = async () => {
       try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+          await superwall.setSubscriptionStatus({ status: 'INACTIVE' });
+          console.log('Subscription status initialized to INACTIVE (no session)');
+          return;
+        }
+
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('subscription_status, subscription_expires_at')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) {
+          console.error('Failed to read profile for subscription status:', error);
+          await superwall.setSubscriptionStatus({ status: 'INACTIVE' });
+          return;
+        }
+
+        const isActive = profile?.subscription_status === 'active';
+        const isExpired = profile?.subscription_expires_at
+          ? new Date(profile.subscription_expires_at) < new Date()
+          : false;
+
         await superwall.setSubscriptionStatus({
-          status: 'INACTIVE',
+          status: isActive && !isExpired ? 'ACTIVE' : 'INACTIVE',
         });
-        console.log('Subscription status initialized to INACTIVE');
+        console.log(
+          `Subscription status initialized to ${isActive && !isExpired ? 'ACTIVE' : 'INACTIVE'}`
+        );
       } catch (error) {
         console.error('Failed to initialize subscription status:', error);
       }

@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { PersonalPlanScreenData } from '../types';
 import { QuestionnaireScreenWrapper } from '../components';
 import { usePaywall } from '../../hooks';
+import { supabase } from '../../lib/supabase';
+import { useSuperwall } from 'expo-superwall';
 
 interface Props {
   data: PersonalPlanScreenData;
@@ -33,10 +35,43 @@ export const PersonalPlanScreen: React.FC<Props> = ({
   const animationStartedRef = useRef(false); // Prevent animation from restarting
   const mountIdRef = useRef(Math.random().toString(36).substr(2, 9)); // Unique ID for this mount
   const renderCountRef = useRef(0);
+  const superwall = useSuperwall();
   
   // Debug: Track renders vs remounts
   renderCountRef.current += 1;
   const wasAnimationStarted = animationStartedRef.current;
+
+  const activatePremiumInSupabase = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        console.error('[PAYWALL] Purchased/restored but no Supabase session found');
+        return false;
+      }
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          subscription_status: 'active',
+          // We identify Superwall with the Supabase auth user id during sign-in.
+          superwall_customer_id: session.user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', session.user.id);
+
+      if (error) {
+        console.error('[PAYWALL] Failed to activate premium in Supabase:', error);
+        return false;
+      }
+
+      await superwall.setSubscriptionStatus({ status: 'ACTIVE' });
+      console.log('[PAYWALL] Premium activated in Supabase for user:', session.user.id);
+      return true;
+    } catch (error) {
+      console.error('[PAYWALL] Unexpected error activating premium:', error);
+      return false;
+    }
+  };
 
   // Paywall hook - shows paywall when user completes the questionnaire
   const { showPaywall, isPresenting, state: paywallState } = usePaywall({
@@ -44,14 +79,30 @@ export const PersonalPlanScreen: React.FC<Props> = ({
     onPresent: () => {
       // Paywall presented
     },
-    onDismiss: (result) => {
-      // Continue to main app after paywall interaction
-      // User either purchased, restored, or declined
-      onContinue();
+    onDismiss: async (result) => {
+      if (result.type === 'purchased' || result.type === 'restored') {
+        const activated = await activatePremiumInSupabase();
+        if (!activated) {
+          Alert.alert(
+            'Purchase detected, but account sync failed',
+            'Please try again. We could not activate premium on your account.'
+          );
+          return;
+        }
+        onContinue();
+      }
     },
-    onSkip: () => {
-      // User is already subscribed or in holdout group
-      onContinue();
+    onSkip: (reason) => {
+      // Let subscribed users through; block misconfigured placements.
+      if (reason.type === 'UserIsSubscribed' || reason.type === 'feature_callback') {
+        onContinue();
+        return;
+      }
+      console.error('[PAYWALL] Skipped with non-subscribed reason:', reason.type);
+      Alert.alert(
+        'Paywall not available',
+        'We could not verify subscription access. Please restart the app and try again.'
+      );
     },
   });
 

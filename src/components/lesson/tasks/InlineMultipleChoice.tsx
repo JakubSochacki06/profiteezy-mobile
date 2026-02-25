@@ -81,9 +81,7 @@ export const InlineMultipleChoice: React.FC<Props> = ({
   return (
     <View style={styles.container}>
       <Text style={styles.question}>{taskData.question}</Text>
-      <Text style={styles.instruction}>
-        Select {requiredSelections} answer{requiredSelections > 1 ? 's' : ''}
-      </Text>
+      {/* Instruction text removed as requested */}
 
       <View style={styles.optionsContainer}>
         {(taskData.options || []).map((option, index) => {
@@ -141,12 +139,7 @@ export const InlineMultipleChoice: React.FC<Props> = ({
         })}
       </View>
 
-      {/* Selection counter */}
-      {!showResult && (
-        <Text style={styles.counter}>
-          {selectedOptions.size} of {requiredSelections} selected
-        </Text>
-      )}
+      {/* Selection counter removed as requested */}
     </View>
   );
 };

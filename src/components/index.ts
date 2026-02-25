@@ -4,3 +4,4 @@ export { Card, type CardProps } from './Card';
 export { Typography, type TypographyProps, type TextVariant, type TextColor } from './Typography';
 export { IconButton, type IconButtonProps, type IconButtonVariant, type IconButtonSize } from './IconButton';
 export { CourseSelectionModal } from './CourseSelectionModal';
+export { LoadingScreen, LoadingIndicator } from './LoadingScreen';

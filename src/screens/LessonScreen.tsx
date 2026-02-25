@@ -5,13 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { Button } from '../components/Button';
-import { IconButton } from '../components';
+import { IconButton, LoadingIndicator } from '../components';
 import { 
   LessonStage, 
   getStageType,
@@ -20,7 +19,7 @@ import {
   SortTaskData,
   FillWordTaskData,
 } from '../types/lesson';
-import { supabase, markLessonComplete } from '../lib/supabase';
+import { supabase, markLessonComplete, updateMissionsAfterLesson, updateStreak, StreakData } from '../lib/supabase';
 import { MarkdownDisplay } from '../components/MarkdownDisplay';
 
 // Inline task components
@@ -29,6 +28,7 @@ import { InlineDragDrop } from '../components/lesson/tasks/InlineDragDrop';
 import { InlineSort } from '../components/lesson/tasks/InlineSort';
 import { InlineFillWord } from '../components/lesson/tasks/InlineFillWord';
 import { FeedbackModal } from '../components/lesson/FeedbackModal'; // Import modal
+import { LessonCompleteModal } from '../components/lesson/LessonCompleteModal';
 
 interface LessonScreenProps {
   lessonId?: string;
@@ -63,8 +63,15 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
   const [isCorrect, setIsCorrect] = useState(false);
   const [isTaskReady, setIsTaskReady] = useState(false);
   
-  // Ref to store the check answer function from task component
+  // Session stats
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [correctAnswersCount, setCorrectAnswersCount] = useState(0);
+  const [firstTryCorrectCount, setFirstTryCorrectCount] = useState(0);
+  const [earnedXP, setEarnedXP] = useState(0);
+  const [streakData, setStreakData] = useState<StreakData | null>(null);
+  
   const checkAnswerRef = useRef<(() => boolean) | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Current stage
   const currentStage = stages[currentStageIndex];
@@ -124,16 +131,34 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
     }
   };
 
-  // Save lesson progress to database
+  // Save lesson progress to database, update daily missions, and update streak
   const saveLessonProgress = useCallback(async () => {
     if (!lessonId) return;
     
-    const result = await markLessonComplete(lessonId, courseId, 0);
+    const result = await markLessonComplete(lessonId, courseId, earnedXP);
     
     if (!result.success) {
       console.error('Failed to save lesson progress:', result.error);
     }
-  }, [lessonId, courseId]);
+
+    // Update daily missions and streak in parallel
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const [, streak] = await Promise.all([
+          updateMissionsAfterLesson(user.id, {
+            pointsEarned: earnedXP,
+            lessonsCompleted: 1,
+            firstTryCorrectCount,
+          }),
+          updateStreak(user.id),
+        ]);
+        setStreakData(streak);
+      }
+    } catch (err) {
+      console.error('Failed to update daily missions / streak:', err);
+    }
+  }, [lessonId, courseId, earnedXP, firstTryCorrectCount]);
 
   // Handle ready state change from task
   const handleReadyChange = useCallback((ready: boolean) => {
@@ -154,8 +179,17 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
       
       const newAttemptCount = attemptCount + 1;
       setAttemptCount(newAttemptCount);
+      
+      if (correct) {
+        setCorrectAnswersCount(prev => prev + 1);
+        setEarnedXP(prev => prev + (currentStage.points || 10));
+        // Track first-try correct answers (attemptCount is 0-based before increment)
+        if (attemptCount === 0) {
+          setFirstTryCorrectCount(prev => prev + 1);
+        }
+      }
     }
-  }, [attemptCount]);
+  }, [attemptCount, currentStage]);
 
   // Handle retry (for wrong answers when attempts remain)
   const handleRetry = useCallback(() => {
@@ -165,19 +199,24 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
   }, []);
 
   // Handle continue to next stage
-  const handleContinue = useCallback(async () => {
+  const handleContinue = useCallback(() => {
     setShowResult(false); // Hide modal immediately
     
     if (currentStageIndex < stages.length - 1) {
-      // Small delay to allow modal to close smoothly? Or just switch content?
-      // Just switch content for now, React updates are fast enough
+      // Scroll to top when continuing to next stage
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
       setCurrentStageIndex(currentStageIndex + 1);
     } else {
-      // Lesson complete
-      await saveLessonProgress();
-      onComplete();
+      // Lesson complete - show modal immediately, save progress in background
+      setShowCompleteModal(true);
+      saveLessonProgress();
     }
-  }, [currentStageIndex, stages.length, saveLessonProgress, onComplete]);
+  }, [currentStageIndex, stages.length, saveLessonProgress]);
+
+  const handleFinishLesson = () => {
+    setShowCompleteModal(false);
+    onComplete();
+  };
 
   // Render task component based on type
   const renderTask = () => {
@@ -240,20 +279,23 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
       );
     }
 
+    const getBottomPadding = () => {
+      if (showResult) return 80;
+      if (stageType === 'text_only') return 20;
+      return 40;
+    };
+
     return (
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[
           styles.contentContainer,
           // Add extra padding at bottom if modal is visible so content isn't covered?
-          // Actually modal is absolute, so content behind is fine. But we might want to scroll up.
-          { paddingBottom: showResult ? 200 : 100 } 
+          // Reduced padding as requested
+          { paddingBottom: getBottomPadding() } 
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {currentStage.title && (
-          <Text style={styles.title}>{currentStage.title}</Text>
-        )}
-        
         <MarkdownDisplay content={currentStage.content} />
 
         {/* Render inline task if this is a text+task stage */}
@@ -302,8 +344,7 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
           />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>Loading lesson...</Text>
+          <LoadingIndicator size={80} />
         </View>
       </View>
     );
@@ -379,6 +420,16 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
           points={currentStage.points || 10}
         />
       )}
+      
+      <LessonCompleteModal
+        isVisible={showCompleteModal}
+        onContinue={handleFinishLesson}
+        xpEarned={earnedXP}
+        correctAnswers={correctAnswersCount}
+        multiplier={1}
+        currentStreak={streakData?.current_streak ?? 0}
+        longestStreak={streakData?.longest_streak ?? 0}
+      />
     </View>
   );
 };
@@ -404,8 +455,8 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   taskContainer: {
-    marginTop: 32,
-    paddingTop: 24,
+    marginTop: 12,
+    paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -452,11 +503,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    fontFamily: 'Inter_500Medium',
   },
   errorContainer: {
     flex: 1,

@@ -15,7 +15,7 @@ interface UsePaywallOptions {
   /** Called when paywall is dismissed with result */
   onDismiss?: (result: PaywallResult) => void;
   /** Called when paywall is skipped (user already subscribed, holdout, etc.) */
-  onSkip?: () => void;
+  onSkip?: (reason: { type: string }) => void;
 }
 
 interface UsePaywallReturn {
@@ -84,7 +84,7 @@ export function usePaywall(options: UsePaywallOptions = {}): UsePaywallReturn {
       console.log('[usePaywall] ⏭️  Paywall SKIPPED. Reason:', reason.type);
       console.log('[usePaywall] Skip reason details:', JSON.stringify(reason, null, 2));
       setState('skipped');
-      onSkip?.();
+      onSkip?.({ type: reason.type });
     },
     onError: (error) => {
       console.error('[usePaywall] ❌ Paywall ERROR:', error);
@@ -105,7 +105,7 @@ export function usePaywall(options: UsePaywallOptions = {}): UsePaywallReturn {
           // User was allowed through without paywall (already subscribed or holdout)
           console.log('[usePaywall] 🎁 Feature callback executed - user allowed through without paywall');
           setState('skipped');
-          onSkip?.();
+          onSkip?.({ type: 'feature_callback' });
         },
       });
       console.log('[usePaywall] ✅ registerPlacement completed');

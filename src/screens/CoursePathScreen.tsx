@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
-  ActivityIndicator,
   Animated,
   Pressable,
 } from 'react-native';
@@ -15,6 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { supabase, getCompletedLessons } from '../lib/supabase';
+import { Button } from '../components/Button';
+import { LoadingIndicator } from '../components';
 
 const { width } = Dimensions.get('window');
 const NODE_SIZE = 90;
@@ -235,18 +236,24 @@ const LessonPopup: React.FC<LessonPopupProps> = ({ lesson, isLeft, isVisible, on
       
       <View style={styles.popupButtons}>
         {lesson.isLocked ? (
-          <TouchableOpacity style={[styles.listenButton, styles.lockedButton]} disabled>
-            <Ionicons name="lock-closed-outline" size={20} color="#A1A1AA" />
-            <Text style={[styles.listenButtonText, styles.lockedButtonText]}>Locked</Text>
-          </TouchableOpacity>
+          <Button
+            title="Locked"
+            onPress={() => {}}
+            variant="secondary"
+            size="medium"
+            disabled
+            fullWidth
+            leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.text.tertiary} />}
+          />
         ) : (
-          <TouchableOpacity 
-            style={styles.listenButton}
+          <Button
+            title="Start"
             onPress={() => onStart && onStart(lesson.id)}
-          >
-            <Ionicons name="play-circle-outline" size={20} color={colors.background} />
-            <Text style={styles.listenButtonText}>Start</Text>
-          </TouchableOpacity>
+            variant="primary"
+            size="medium"
+            fullWidth
+            leftIcon={<Ionicons name="play" size={18} color={colors.background} />}
+          />
         )}
       </View>
     </Animated.View>
@@ -278,39 +285,27 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
       setLoading(true);
       setError(null);
 
-      console.log('=== FETCHING COURSE DATA ===');
-      console.log('Course ID:', course.id);
+      // Fetch stages, lessons, and completed lessons all in parallel
+      const [stagesResult, lessonsResult, completedLessonIds] = await Promise.all([
+        supabase
+          .from('stages')
+          .select('*')
+          .eq('course_id', course.id)
+          .order('order', { ascending: true }),
+        supabase
+          .from('lessons')
+          .select('*')
+          .eq('course_id', course.id)
+          .order('number', { ascending: true }),
+        getCompletedLessons(course.id),
+      ]);
 
-      // Fetch stages for this course
-      const { data: stagesData, error: stagesError } = await supabase
-        .from('stages')
-        .select('*')
-        .eq('course_id', course.id)
-        .order('order', { ascending: true });
+      if (stagesResult.error) throw stagesResult.error;
+      if (lessonsResult.error) throw lessonsResult.error;
 
-      if (stagesError) throw stagesError;
-
-      console.log('=== STAGES ===');
-      console.log(JSON.stringify(stagesData, null, 2));
-
-      // Fetch lessons for this course
-      const { data: lessonsData, error: lessonsError } = await supabase
-        .from('lessons')
-        .select('*')
-        .eq('course_id', course.id)
-        .order('number', { ascending: true });
-
-      if (lessonsError) throw lessonsError;
-
-      console.log('=== LESSONS ===');
-      console.log(JSON.stringify(lessonsData, null, 2));
-
-      // Fetch user's completed lessons for this course
-      const completedLessonIds = await getCompletedLessons(course.id);
+      const stagesData = stagesResult.data;
+      const lessonsData = lessonsResult.data;
       const completedSet = new Set(completedLessonIds);
-      
-      console.log('=== COMPLETED LESSONS ===');
-      console.log('Completed:', completedLessonIds);
 
       // Build a flat list of all lessons in order to determine unlock status
       const allLessonsOrdered: { id: string; stageIndex: number; lessonIndex: number }[] = [];
@@ -363,12 +358,6 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
           order: stage.order,
           lessons: stageLessons,
         };
-      });
-
-      console.log('=== STAGES WITH LESSONS ===');
-      stagesWithLessons.forEach(s => {
-        console.log(`Stage: ${s.title} (${s.lessons.length} lessons)`);
-        s.lessons.forEach(l => console.log(`  - ${l.title} [${l.isCompleted ? 'DONE' : l.isLocked ? 'LOCKED' : 'UNLOCKED'}]`));
       });
 
       setStages(stagesWithLessons);
@@ -513,17 +502,18 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-        <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
-          {showBackButton && (
-            <TouchableOpacity onPress={onBack} style={styles.backButton}>
-              <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          )}
-          <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
-        </View>
+        {showHeader && (
+          <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
+            {showBackButton && (
+              <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            )}
+            <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
+          </View>
+        )}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>Loading course...</Text>
+          <LoadingIndicator size={80} />
         </View>
       </View>
     );
@@ -533,21 +523,28 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
     return (
       <View style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-        <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
-          {showBackButton && (
-            <TouchableOpacity onPress={onBack} style={styles.backButton}>
-              <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
-            </TouchableOpacity>
-          )}
-          <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
-        </View>
+        {showHeader && (
+          <View style={[styles.stickyHeader, { paddingTop: insets.top + 10 }]}>
+            {showBackButton && (
+              <TouchableOpacity onPress={onBack} style={styles.backButton}>
+                <Ionicons name="chevron-back" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            )}
+            <Text style={styles.headerCourseName} numberOfLines={1}>{course.title}</Text>
+          </View>
+        )}
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
           <Text style={styles.errorTitle}>Something went wrong</Text>
           <Text style={styles.errorSubtitle}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchCourseData}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
+          <View style={{ marginTop: 16 }}>
+            <Button
+              title="Try Again"
+              onPress={fetchCourseData}
+              variant="primary"
+              size="medium"
+            />
+          </View>
         </View>
       </View>
     );
@@ -916,39 +913,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  listenButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: colors.accent,
-    gap: 8,
-  },
-  listenButtonText: {
-    color: colors.background,
-    fontWeight: '600',
-    fontFamily: 'Inter_600SemiBold',
-  },
-  lockedButton: {
-    backgroundColor: '#3F3F46',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  lockedButtonText: {
-    color: '#A1A1AA',
-  },
+  // Button styles removed - now using Button component
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    fontFamily: 'Inter_500Medium',
   },
   errorContainer: {
     flex: 1,
@@ -970,19 +940,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: 'Inter_400Regular',
   },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: colors.accent,
-    borderRadius: 12,
-  },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.background,
-    fontFamily: 'Inter_600SemiBold',
-  },
+  // retryButton styles removed - now using Button component
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',

@@ -102,6 +102,11 @@ export const questionnaireData: QuestionnaireData = {
       // title: "You're doing great!",
     },
     {
+      type: 'sign_in' as const,
+      title: 'Create your account',
+      subtitle: 'Sign in to save your progress and unlock your personalized plan.',
+    },
+    {
         id: 'q4',
         title: 'Have you ever tried making money online?',
       //   subtitle: 'What would you like to achieve at the end?',

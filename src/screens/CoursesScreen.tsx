@@ -9,13 +9,12 @@ import {
   Dimensions,
   TouchableOpacity,
   BackHandler,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useNavigation } from '@react-navigation/native';
-import { IconButton } from '../components';
+import { IconButton, LoadingIndicator } from '../components';
 import { CoursePathScreen } from './CoursePathScreen';
 import { LessonScreen } from './LessonScreen';
 import { supabase, Course as SupabaseCourse } from '../lib/supabase';
@@ -146,7 +145,6 @@ export const CoursesScreen = () => {
         courseId={selectedCourse.id}
         onClose={() => setActiveLessonId(null)}
         onComplete={() => {
-          console.log('Lesson completed');
           setActiveLessonId(null);
         }}
       />
@@ -236,8 +234,7 @@ export const CoursesScreen = () => {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>Loading courses...</Text>
+          <LoadingIndicator size={80} />
         </View>
       ) : error ? (
         renderErrorState()
@@ -348,11 +345,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    fontFamily: 'Inter_500Medium',
   },
   emptyState: {
     flex: 1,

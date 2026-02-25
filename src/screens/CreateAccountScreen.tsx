@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { colors } from '../theme/colors';
 import { supabase, upsertProfile } from '../lib/supabase';
+import { Button } from '../components/Button';
 import {
   GoogleSignin,
   isSuccessResponse,
@@ -67,33 +68,25 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({ onComp
         if (data.session && data.user) {
           console.log('Successfully signed in with Google!', data.user.email);
 
-          // Get Superwall user ID
-          let superwallCustomerId: string | null = null;
+          // Link Superwall to the authenticated user before saving profile metadata.
           try {
-            superwallCustomerId = await superwall.getUserId();
+            await superwall.identify(data.user.id);
           } catch (e) {
-            console.warn('Could not get Superwall user ID:', e);
+            console.warn('Could not identify Superwall user:', e);
           }
 
-          // Upsert profile with Superwall customer ID
+          // Upsert profile with the identified Superwall customer ID.
           const profileResult = await upsertProfile({
             id: data.user.id,
             email: data.user.email ?? null,
             full_name: data.user.user_metadata?.full_name ?? null,
             avatar_url: data.user.user_metadata?.avatar_url ?? null,
-            superwall_customer_id: superwallCustomerId,
+            superwall_customer_id: data.user.id,
             subscription_status: 'active',
           });
 
           if (!profileResult.success) {
             console.error('Profile upsert failed:', profileResult.error);
-          }
-
-          // Link Superwall to the authenticated user
-          try {
-            await superwall.identify(data.user.id);
-          } catch (e) {
-            console.warn('Could not identify Superwall user:', e);
           }
 
           onComplete();
@@ -146,25 +139,26 @@ export const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({ onComp
 
           {/* Bottom section with button */}
           <View style={[styles.bottomSection, { paddingBottom: 28 + insets.bottom }]}>
-            <TouchableOpacity
-              style={[styles.googleButton, isSigningIn && styles.googleButtonDisabled]}
-              onPress={handleGoogleSignIn}
-              disabled={isSigningIn}
-              activeOpacity={0.9}
-            >
-              {isSigningIn ? (
-                <ActivityIndicator size="small" color={colors.background} style={styles.buttonIcon} />
-              ) : (
-                <Image
-                  source={require('../../assets/logos/googleLogo.png')}
-                  style={styles.googleLogo}
-                  resizeMode="contain"
-                />
-              )}
-              <Text style={styles.googleButtonText}>
-                {isSigningIn ? 'Signing in...' : 'Sign in with Google'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ marginBottom: 16 }}>
+              <Button
+                title={isSigningIn ? 'Signing in...' : 'Sign in with Google'}
+                onPress={handleGoogleSignIn}
+                variant="primary"
+                size="large"
+                fullWidth
+                disabled={isSigningIn}
+                loading={isSigningIn}
+                leftIcon={
+                  !isSigningIn ? (
+                    <Image
+                      source={require('../../assets/logos/googleLogo.png')}
+                      style={styles.googleLogo}
+                      resizeMode="contain"
+                    />
+                  ) : undefined
+                }
+              />
+            </View>
 
             <Text style={styles.footerText}>
               By continuing, you agree to Hustlingo's{' '}
@@ -232,30 +226,10 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  googleButtonDisabled: {
-    opacity: 0.6,
-  },
-  buttonIcon: {
-    marginRight: 12,
-  },
+  // googleButton styles removed - now using Button component
   googleLogo: {
     width: 20,
     height: 20,
-    marginRight: 12,
-  },
-  googleButtonText: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.background,
   },
   footerText: {
     fontSize: 12,
