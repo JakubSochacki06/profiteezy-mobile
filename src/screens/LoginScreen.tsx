@@ -31,6 +31,7 @@ import {
   statusCodes,
 } from '@react-native-google-signin/google-signin';
 import { supabase } from '../lib/supabase';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 const { width, height } = Dimensions.get('window');
 
@@ -68,6 +69,7 @@ export const LoginScreen = () => {
   const [showHome, setShowHome] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
+  const [isAppleSigningIn, setIsAppleSigningIn] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Animation values
@@ -249,6 +251,71 @@ export const LoginScreen = () => {
       }
     } finally {
       setIsGoogleSigningIn(false);
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    try {
+      setIsAppleSigningIn(true);
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('No identity token returned from Apple Sign-In');
+      }
+
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) {
+        console.error('Supabase auth error:', error);
+        Alert.alert('Sign In Error', error.message);
+        return;
+      }
+
+      if (data.session) {
+        console.log('Successfully signed in with Apple!', data.user?.email);
+
+        // Apple only provides the user's full name on the very first sign-in.
+        // Save it to Supabase Auth user metadata immediately if available.
+        if (credential.fullName) {
+          const nameParts = [];
+          if (credential.fullName.givenName) nameParts.push(credential.fullName.givenName);
+          if (credential.fullName.middleName) nameParts.push(credential.fullName.middleName);
+          if (credential.fullName.familyName) nameParts.push(credential.fullName.familyName);
+
+          const fullName = nameParts.join(' ');
+          if (fullName) {
+            await supabase.auth.updateUser({
+              data: {
+                full_name: fullName,
+                given_name: credential.fullName.givenName,
+                family_name: credential.fullName.familyName,
+              },
+            });
+          }
+        }
+
+        handleCloseModal();
+        setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
+        setShowQuestionnaire(true);
+      }
+    } catch (error: any) {
+      if (error.code === 'ERR_REQUEST_CANCELED') {
+        console.log('User cancelled Apple sign-in');
+      } else {
+        console.error('Apple Sign-In error:', error);
+        Alert.alert('Sign In Error', error.message || 'An unexpected error occurred');
+      }
+    } finally {
+      setIsAppleSigningIn(false);
     }
   };
 
@@ -520,6 +587,24 @@ export const LoginScreen = () => {
                     </Text>
                   </TouchableOpacity>
 
+                  {Platform.OS === 'ios' && (
+                    <TouchableOpacity
+                      style={[styles.authButton, styles.appleButton, isAppleSigningIn && styles.authButtonDisabled]}
+                      onPress={handleAppleSignIn}
+                      disabled={isAppleSigningIn}
+                      activeOpacity={0.7}
+                    >
+                      {isAppleSigningIn ? (
+                        <ActivityIndicator size="small" color="#000000" style={styles.authIcon} />
+                      ) : (
+                        <Ionicons name="logo-apple" size={20} color="#000000" style={styles.authIcon} />
+                      )}
+                      <Text style={styles.appleButtonText}>
+                        {isAppleSigningIn ? 'Signing in...' : 'Sign in with Apple'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   <TouchableOpacity style={styles.authButton}>
                     <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
                     <Text style={styles.authButtonText}>Sign in with Email</Text>
@@ -735,6 +820,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter_600SemiBold',
     color: colors.text.primary,
+  },
+  appleButton: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+  },
+  appleButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#000000',
   },
   modalFooter: {
     alignItems: 'center',

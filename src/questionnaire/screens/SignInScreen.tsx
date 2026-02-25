@@ -7,7 +7,10 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { colors } from '../../theme/colors';
 import { SignInScreenData } from '../types';
 import { QuestionnaireScreenWrapper } from '../components';
@@ -36,6 +39,7 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   totalSteps,
 }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isAppleSigningIn, setIsAppleSigningIn] = useState(false);
   const superwall = useSuperwall();
 
   // Auto-skip if user is already signed in (e.g. from "I already have an account")
@@ -161,6 +165,103 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     }
   };
 
+  const handleAppleSignIn = async () => {
+    try {
+      setIsAppleSigningIn(true);
+
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+
+      if (!credential.identityToken) {
+        throw new Error('No identity token returned from Apple Sign-In');
+      }
+
+      const { data: authData, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+
+      if (error) {
+        console.error('Supabase auth error:', error);
+        Alert.alert('Sign In Error', error.message);
+        return;
+      }
+
+      if (authData.session && authData.user) {
+        console.log('========================================');
+        console.log('[CREATE ACCOUNT] ✅ Apple Sign-In successful');
+        console.log('[CREATE ACCOUNT] Email:', authData.user.email);
+        console.log('[CREATE ACCOUNT] User ID:', authData.user.id);
+
+        try {
+          await superwall.identify(authData.user.id);
+          console.log('[CREATE ACCOUNT] ✅ Superwall identified with user ID');
+        } catch (e) {
+          console.warn('[CREATE ACCOUNT] ⚠️ Could not identify Superwall user:', e);
+        }
+
+        // Apple only provides the user's full name on the very first sign-in.
+        // Save it to Supabase Auth user metadata immediately if available.
+        let fullName: string | null = authData.user.user_metadata?.full_name ?? null;
+        if (credential.fullName) {
+          const nameParts = [];
+          if (credential.fullName.givenName) nameParts.push(credential.fullName.givenName);
+          if (credential.fullName.middleName) nameParts.push(credential.fullName.middleName);
+          if (credential.fullName.familyName) nameParts.push(credential.fullName.familyName);
+
+          const appleName = nameParts.join(' ');
+          if (appleName) {
+            fullName = appleName;
+            await supabase.auth.updateUser({
+              data: {
+                full_name: fullName,
+                given_name: credential.fullName.givenName,
+                family_name: credential.fullName.familyName,
+              },
+            });
+          }
+        }
+
+        const profileData = {
+          id: authData.user.id,
+          email: authData.user.email ?? null,
+          full_name: fullName,
+          avatar_url: authData.user.user_metadata?.avatar_url ?? null,
+          superwall_customer_id: authData.user.id,
+          subscription_status: 'inactive',
+          points: 0,
+        };
+        console.log('[CREATE ACCOUNT] Upserting profile to Supabase:', JSON.stringify(profileData, null, 2));
+
+        const profileResult = await upsertProfile(profileData);
+
+        if (profileResult.success) {
+          console.log('[CREATE ACCOUNT] ✅ Profile upserted successfully');
+        } else {
+          console.error('[CREATE ACCOUNT] ❌ Profile upsert FAILED:', profileResult.error);
+        }
+
+        console.log('[CREATE ACCOUNT] ✅ Account creation complete, continuing questionnaire');
+        console.log('========================================');
+
+        onContinue();
+      }
+    } catch (error: any) {
+      if (error.code === 'ERR_REQUEST_CANCELED') {
+        console.log('User cancelled Apple sign-in');
+      } else {
+        console.error('Apple Sign-In error:', error);
+        Alert.alert('Sign In Error', error.message || 'An unexpected error occurred');
+      }
+    } finally {
+      setIsAppleSigningIn(false);
+    }
+  };
+
   return (
     <QuestionnaireScreenWrapper
       currentStep={currentStep}
@@ -204,6 +305,24 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
               {isSigningIn ? 'Signing in...' : 'Sign in with Google'}
             </Text>
           </TouchableOpacity>
+
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[styles.appleButton, isAppleSigningIn && styles.googleButtonDisabled]}
+              onPress={handleAppleSignIn}
+              disabled={isAppleSigningIn}
+              activeOpacity={0.7}
+            >
+              {isAppleSigningIn ? (
+                <ActivityIndicator size="small" color="#000000" style={styles.buttonIcon} />
+              ) : (
+                <Ionicons name="logo-apple" size={20} color="#000000" style={styles.buttonIcon} />
+              )}
+              <Text style={styles.appleButtonText}>
+                {isAppleSigningIn ? 'Signing in...' : 'Sign in with Apple'}
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <Text style={styles.footerText}>
             By continuing, you agree to Hustlingo's{' '}
@@ -281,6 +400,21 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   googleButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#000000',
+  },
+  appleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    marginBottom: 16,
+  },
+  appleButtonText: {
     fontSize: 16,
     fontFamily: 'Inter_600SemiBold',
     color: '#000000',
