@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, Image, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../../theme/colors';
 import { PersonalPlanScreenData } from '../types';
@@ -14,9 +14,14 @@ interface Props {
   onBack: () => void; // Usually disabled here but kept for interface consistency
   currentStep: number;
   totalSteps: number;
-  /** Placement name for the paywall (defaults to 'onboarding_paywall') */
+  /** Placement name for the paywall (defaults based on platform) */
   paywallPlacement?: string;
 }
+
+const DEFAULT_PAYWALL_PLACEMENT = Platform.select({
+  ios: 'onboarding_paywall_ios',
+  default: 'onboarding_paywall_android',
+});
 
 export const PersonalPlanScreen: React.FC<Props> = ({
   data,
@@ -24,7 +29,7 @@ export const PersonalPlanScreen: React.FC<Props> = ({
   onBack,
   currentStep,
   totalSteps,
-  paywallPlacement = 'onboarding_paywall_android',
+  paywallPlacement = DEFAULT_PAYWALL_PLACEMENT,
 }) => {
   const [percent, setPercent] = useState(0);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
@@ -72,6 +77,8 @@ export const PersonalPlanScreen: React.FC<Props> = ({
       return false;
     }
   };
+
+  console.log('[PAYWALL] Using placement:', paywallPlacement);
 
   // Paywall hook - shows paywall when user completes the questionnaire
   const { showPaywall, isPresenting, state: paywallState } = usePaywall({

@@ -15,9 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hustlingo.app",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "usesAppleSignIn": true
     },
     "scheme": "hustlingo",
     "android": {
