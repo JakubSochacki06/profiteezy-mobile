@@ -7,7 +7,7 @@ import { QuestionnaireData } from './types';
 
 export const questionnaireData: QuestionnaireData = {
   welcome: {
-    image: require('../../assets/laptop-icon.png'), // Replace with your welcome image
+    image: require('../../assets/questionnaire/welcomeImage.jpg'), // Replace with your welcome image
     title: '28-Day Money Challenge',
     subtitle: 'start making money online',
     buttonText: 'Get Started',

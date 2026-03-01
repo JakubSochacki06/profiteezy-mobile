@@ -4,13 +4,12 @@ import {
   Text,
   Image,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
   StatusBar,
-  Platform,
 } from 'react-native';
 import { colors } from '../../theme/colors';
 import { WelcomeScreenData } from '../types';
+import { QuestionnaireButton } from '../components';
 
 interface WelcomeScreenProps {
   data: WelcomeScreenData;
@@ -25,44 +24,36 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
       <SafeAreaView style={styles.safeArea}>
-        {/* Hidden Navbar (for spacing consistency) */}
-        <View style={styles.hiddenNavbar} />
+        {/* Spacer */}
+        <View style={styles.spacer} />
 
         {/* Image */}
         <View style={styles.imageContainer}>
           <Image
             source={data.image}
             style={styles.image}
-            resizeMode="contain"
+            resizeMode="cover"
           />
         </View>
 
         {/* Title */}
-        <Text
-          style={styles.title}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          {data.title}
-        </Text>
+        <View style={styles.textContainer}>
+          <Text style={styles.title}>{data.title}</Text>
+        </View>
 
         {/* Subtitle */}
-        <Text style={styles.subtitle}>{data.subtitle}</Text>
-
-        {/* Bottom Section - directly under subtitle */}
-        <View style={styles.bottomSection}>
-          {/* Continue Button */}
-          <TouchableOpacity
-            style={styles.button}
-            onPress={onContinue}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.buttonText}>{data.buttonText}</Text>
-          </TouchableOpacity>
-
-          {/* Terms Text */}
-          <Text style={styles.termsText}>{data.termsText}</Text>
+        <View style={styles.subtitleContainer}>
+          <Text style={styles.subtitle}>{data.subtitle}</Text>
         </View>
+
+        {/* Spacer */}
+        <View style={styles.spacer} />
+
+        {/* Button - same as other questionnaire screens */}
+        <QuestionnaireButton
+          onPress={onContinue}
+          text={data.buttonText}
+        />
       </SafeAreaView>
     </View>
   );
@@ -76,62 +67,45 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  hiddenNavbar: {
-    height: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 16 + 40 + 16 : 16 + 40 + 16,
-    opacity: 0,
+  spacer: {
+    flex: 1,
   },
   imageContainer: {
-    width: 280,
-    height: 280,
+    width: '95%',
     alignSelf: 'center',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 32,
+    borderWidth: 3,
+    borderColor: colors.surface,
+    borderRadius: 28,
+    overflow: 'hidden',
   },
   image: {
     width: '100%',
-    height: '100%',
-    borderRadius: 24,
+    height: undefined,
+    aspectRatio: 1,
+    transform: [{ rotate: '45deg' }, { scale: 1.1 }],
+  },
+  textContainer: {
+    paddingHorizontal: 50,
+    paddingTop: 20,
+    paddingBottom: 8,
   },
   title: {
     fontSize: 28,
     fontFamily: 'Inter_700Bold',
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 32,
+  },
+  subtitleContainer: {
+    paddingHorizontal: 50,
+    paddingTop: 8,
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: 'Inter_400Regular',
     color: colors.text.secondary,
     textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 32,
-  },
-  bottomSection: {
-    paddingHorizontal: 24,
-    paddingTop: 28,
-    paddingBottom: 28,
-  },
-  button: {
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  buttonText: {
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-    color: colors.background,
-  },
-  termsText: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    color: colors.text.tertiary,
-    textAlign: 'center',
-    lineHeight: 16,
+    lineHeight: 24,
   },
 });

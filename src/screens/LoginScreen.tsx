@@ -15,6 +15,10 @@ import {
   Easing,
   Alert,
   ActivityIndicator,
+  TextInput,
+  Keyboard,
+  KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -69,6 +73,14 @@ export const LoginScreen = () => {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Email sign-in state
+  type EmailSignInStep = 'choose' | 'enterCredentials';
+  const [emailSignInStep, setEmailSignInStep] = useState<EmailSignInStep>('choose');
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isEmailSigningIn, setIsEmailSigningIn] = useState(false);
+  const passwordInputRef = useRef<TextInput>(null);
 
   // Animation values
   const slideAnim = useRef(new Animated.Value(height)).current;
@@ -149,6 +161,7 @@ export const LoginScreen = () => {
   }, [showSignInModal]);
 
   const handleCloseModal = () => {
+    Keyboard.dismiss();
     Animated.parallel([
       Animated.timing(slideAnim, {
         toValue: height,
@@ -163,6 +176,10 @@ export const LoginScreen = () => {
       }),
     ]).start(() => {
       setShowSignInModal(false);
+      // Reset email sign-in state when modal closes
+      setEmailSignInStep('choose');
+      setEmailInput('');
+      setPasswordInput('');
     });
   };
 
@@ -249,6 +266,68 @@ export const LoginScreen = () => {
       }
     } finally {
       setIsGoogleSigningIn(false);
+    }
+  };
+
+  const handleEmailSignIn = () => {
+    setEmailSignInStep('enterCredentials');
+  };
+
+  const handleEmailPasswordSignIn = async () => {
+    const trimmedEmail = emailInput.trim().toLowerCase();
+    const trimmedPassword = passwordInput.trim();
+
+    if (!trimmedEmail) {
+      Alert.alert('Email Required', 'Please enter your email address.');
+      return;
+    }
+
+    if (!trimmedPassword) {
+      Alert.alert('Password Required', 'Please enter your password.');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setIsEmailSigningIn(true);
+      Keyboard.dismiss();
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password: trimmedPassword,
+      });
+
+      if (error) {
+        console.error('Email sign-in error:', error);
+        if (error.message.includes('Invalid login credentials')) {
+          Alert.alert(
+            'Sign In Failed',
+            'Invalid email or password. Please check your credentials and try again.'
+          );
+        } else {
+          Alert.alert('Error', error.message);
+        }
+        return;
+      }
+
+      if (data.session) {
+        console.log('Successfully signed in with Email/Password!', data.user?.email);
+        // Close the modal and go to the last questionnaire step (before paywall)
+        handleCloseModal();
+        setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
+        setShowQuestionnaire(true);
+      }
+    } catch (err: any) {
+      console.error('Error signing in:', err);
+      Alert.alert('Error', err.message || 'Failed to sign in.');
+    } finally {
+      setIsEmailSigningIn(false);
     }
   };
 
@@ -477,7 +556,12 @@ export const LoginScreen = () => {
               }
             ]}
           >
-            <TouchableWithoutFeedback>
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                style={{ width: '100%' }}
+              >
               <Animated.View
                 style={[
                   styles.modalContent,
@@ -489,7 +573,22 @@ export const LoginScreen = () => {
               >
                 {/* Header */}
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Sign in</Text>
+                  {emailSignInStep !== 'choose' && (
+                    <TouchableOpacity
+                      style={styles.backButton}
+                      onPress={() => {
+                        setEmailInput('');
+                        setPasswordInput('');
+                        setEmailSignInStep('choose');
+                      }}
+                    >
+                      <Ionicons name="arrow-back" size={24} color={colors.text.secondary} />
+                    </TouchableOpacity>
+                  )}
+                  <Text style={styles.modalTitle}>
+                    {emailSignInStep === 'choose' && 'Sign in'}
+                    {emailSignInStep === 'enterCredentials' && 'Sign in with Email'}
+                  </Text>
                   <TouchableOpacity
                     style={styles.closeButton}
                     onPress={handleCloseModal}
@@ -498,43 +597,107 @@ export const LoginScreen = () => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Sign In Options */}
-                <View style={styles.modalBody}>
-                  <TouchableOpacity
-                    style={[styles.authButton, isGoogleSigningIn && styles.authButtonDisabled]}
-                    onPress={handleGoogleSignIn}
-                    disabled={isGoogleSigningIn}
-                    activeOpacity={0.7}
+                {/* Step: Choose sign-in method */}
+                {emailSignInStep === 'choose' && (
+                  <>
+                    <View style={styles.modalBody}>
+                      <TouchableOpacity
+                        style={[styles.authButton, isGoogleSigningIn && styles.authButtonDisabled]}
+                        onPress={handleGoogleSignIn}
+                        disabled={isGoogleSigningIn}
+                        activeOpacity={0.7}
+                      >
+                        {isGoogleSigningIn ? (
+                          <ActivityIndicator size="small" color={colors.text.primary} style={styles.authIcon} />
+                        ) : (
+                          <Image
+                            source={require('../../assets/logos/googleLogo.png')}
+                            style={styles.googleLogo}
+                            resizeMode="contain"
+                          />
+                        )}
+                        <Text style={styles.authButtonText}>
+                          {isGoogleSigningIn ? 'Signing in...' : 'Sign in with Google'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.authButton}
+                        onPress={handleEmailSignIn}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
+                        <Text style={styles.authButtonText}>Sign in with Email</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.modalFooter}>
+                      <Text style={styles.footerText}>
+                        By continuing, you agree to Hustlingo's{' '}
+                        <Text style={styles.footerLink}>Terms and Conditions</Text> and{' '}
+                        <Text style={styles.footerLink}>Privacy Policy</Text>
+                      </Text>
+                    </View>
+                  </>
+                )}
+
+                {/* Step: Enter email and password */}
+                {emailSignInStep === 'enterCredentials' && (
+                  <ScrollView
+                    contentContainerStyle={styles.modalBody}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
                   >
-                    {isGoogleSigningIn ? (
-                      <ActivityIndicator size="small" color={colors.text.primary} style={styles.authIcon} />
-                    ) : (
-                      <Image
-                        source={require('../../assets/logos/googleLogo.png')}
-                        style={styles.googleLogo}
-                        resizeMode="contain"
-                      />
-                    )}
-                    <Text style={styles.authButtonText}>
-                      {isGoogleSigningIn ? 'Signing in...' : 'Sign in with Google'}
+                    <Text style={styles.emailInstructions}>
+                      Enter your email and password to sign in to your account.
                     </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.authButton}>
-                    <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
-                    <Text style={styles.authButtonText}>Sign in with Email</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Footer */}
-                <View style={styles.modalFooter}>
-                  <Text style={styles.footerText}>
-                    By continuing, you agree to Hustlingo's{' '}
-                    <Text style={styles.footerLink}>Terms and Conditions</Text> and{' '}
-                    <Text style={styles.footerLink}>Privacy Policy</Text>
-                  </Text>
-                </View>
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Email address"
+                      placeholderTextColor={colors.text.tertiary}
+                      value={emailInput}
+                      onChangeText={setEmailInput}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="email"
+                      returnKeyType="next"
+                      onSubmitEditing={() => {
+                        passwordInputRef.current?.focus();
+                      }}
+                      editable={!isEmailSigningIn}
+                    />
+                    <TextInput
+                      ref={passwordInputRef}
+                      style={styles.textInput}
+                      placeholder="Password"
+                      placeholderTextColor={colors.text.tertiary}
+                      value={passwordInput}
+                      onChangeText={setPasswordInput}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="done"
+                      onSubmitEditing={handleEmailPasswordSignIn}
+                      editable={!isEmailSigningIn}
+                    />
+                    <TouchableOpacity
+                      style={[styles.emailSubmitButton, (isEmailSigningIn || !emailInput.trim() || !passwordInput.trim()) && styles.authButtonDisabled]}
+                      onPress={handleEmailPasswordSignIn}
+                      disabled={isEmailSigningIn || !emailInput.trim() || !passwordInput.trim()}
+                      activeOpacity={0.7}
+                    >
+                      {isEmailSigningIn ? (
+                        <ActivityIndicator size="small" color="#000000" />
+                      ) : (
+                        <Text style={styles.emailSubmitButtonText}>Sign in</Text>
+                      )}
+                    </TouchableOpacity>
+                  </ScrollView>
+                )}
               </Animated.View>
+              </KeyboardAvoidingView>
             </TouchableWithoutFeedback>
           </Animated.View>
         </TouchableWithoutFeedback>
@@ -749,5 +912,48 @@ const styles = StyleSheet.create({
   footerLink: {
     textDecorationLine: 'underline',
     color: colors.text.primary,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    padding: 4,
+    backgroundColor: colors.border,
+    borderRadius: 20,
+  },
+  emailInstructions: {
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    color: colors.text.secondary,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  emailHighlight: {
+    fontFamily: 'Inter_600SemiBold',
+    color: colors.text.primary,
+  },
+  textInput: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
+    color: colors.text.primary,
+    marginBottom: 16,
+  },
+  emailSubmitButton: {
+    backgroundColor: colors.accent,
+    paddingVertical: 16,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  emailSubmitButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#000000',
   },
 });
