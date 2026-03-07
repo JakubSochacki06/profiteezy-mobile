@@ -6,6 +6,7 @@ import {
   StatusBar,
   Image,
 } from 'react-native';
+import { ReferralModal } from '../components/ReferralModal';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors } from '../theme/colors';
@@ -40,6 +41,7 @@ export const DailyMissionsScreen = () => {
   const insets = useSafeAreaInsets();
   const [missions, setMissions] = useState<UserDailyMission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showReferral, setShowReferral] = useState(false);
 
   const loadMissions = async () => {
     try {
@@ -129,6 +131,7 @@ export const DailyMissionsScreen = () => {
             definition={topMission}
             progress={getMissionProgress(topMission.key)}
             variant="featured"
+            onInvite={() => setShowReferral(true)}
           />
         </View>
 
@@ -168,6 +171,8 @@ export const DailyMissionsScreen = () => {
           ))}
         </View>
       </ScrollView>
+
+      <ReferralModal visible={showReferral} onClose={() => setShowReferral(false)} />
     </View>
   );
 };
@@ -178,12 +183,14 @@ interface MissionCardProps {
   definition: MissionDefinition;
   progress?: UserDailyMission;
   variant: 'featured' | 'default';
+  onInvite?: () => void;
 }
 
 const MissionCard: React.FC<MissionCardProps> = ({
   definition,
   progress,
   variant,
+  onInvite,
 }) => {
   const current = progress?.progress ?? 0;
   const target = definition.target;
@@ -249,7 +256,7 @@ const MissionCard: React.FC<MissionCardProps> = ({
         <View style={styles.buttonContainer}>
           <Button
             title="INVITE A FRIEND"
-            onPress={() => {}}
+            onPress={() => onInvite?.()}
             variant="primary"
             size="medium"
             fullWidth

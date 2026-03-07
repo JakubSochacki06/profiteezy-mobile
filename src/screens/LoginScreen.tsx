@@ -205,6 +205,32 @@ export const LoginScreen = () => {
     setShowSignInModal(true);
   };
 
+  const handlePostSignIn = async (userId: string) => {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('subscription_status, subscription_expires_at')
+      .eq('id', userId)
+      .single();
+
+    if (!error && profile) {
+      const isActive = profile.subscription_status === 'active';
+      const isExpired = profile.subscription_expires_at
+        ? new Date(profile.subscription_expires_at) < new Date()
+        : false;
+
+      if (isActive && !isExpired) {
+        handleCloseModal();
+        setShowHome(true);
+        return;
+      }
+    }
+
+    // No active subscription — send to paywall
+    handleCloseModal();
+    setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
+    setShowQuestionnaire(true);
+  };
+
   const handleGoogleSignIn = async () => {
     try {
       setIsGoogleSigningIn(true);
@@ -237,10 +263,7 @@ export const LoginScreen = () => {
 
         if (data.session) {
           console.log('Successfully signed in with Google!', data.user?.email);
-          // Close the modal and go to the last questionnaire step (before paywall)
-          handleCloseModal();
-          setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
-          setShowQuestionnaire(true);
+          await handlePostSignIn(data.user.id);
         }
       }
     } catch (error: any) {
@@ -271,7 +294,6 @@ export const LoginScreen = () => {
     }
   };
 
-<<<<<<< HEAD
   const handleEmailSignIn = () => {
     setEmailSignInStep('enterCredentials');
   };
@@ -316,7 +338,21 @@ export const LoginScreen = () => {
         } else {
           Alert.alert('Error', error.message);
         }
-=======
+        return;
+      }
+
+      if (data.session) {
+        console.log('Successfully signed in with Email/Password!', data.user?.email);
+        await handlePostSignIn(data.user.id);
+      }
+    } catch (err: any) {
+      console.error('Error signing in:', err);
+      Alert.alert('Error', err.message || 'Failed to sign in.');
+    } finally {
+      setIsEmailSigningIn(false);
+    }
+  };
+
   const handleAppleSignIn = async () => {
     try {
       setIsAppleSigningIn(true);
@@ -340,21 +376,15 @@ export const LoginScreen = () => {
       if (error) {
         console.error('Supabase auth error:', error);
         Alert.alert('Sign In Error', error.message);
->>>>>>> 4224f0f1b543a7b61a66113585077f9a09f198c3
         return;
       }
 
       if (data.session) {
-<<<<<<< HEAD
-        console.log('Successfully signed in with Email/Password!', data.user?.email);
-        // Close the modal and go to the last questionnaire step (before paywall)
-=======
         console.log('Successfully signed in with Apple!', data.user?.email);
 
         // Apple only provides the user's full name on the very first sign-in.
-        // Save it to Supabase Auth user metadata immediately if available.
         if (credential.fullName) {
-          const nameParts = [];
+          const nameParts: string[] = [];
           if (credential.fullName.givenName) nameParts.push(credential.fullName.givenName);
           if (credential.fullName.middleName) nameParts.push(credential.fullName.middleName);
           if (credential.fullName.familyName) nameParts.push(credential.fullName.familyName);
@@ -371,20 +401,10 @@ export const LoginScreen = () => {
           }
         }
 
->>>>>>> 4224f0f1b543a7b61a66113585077f9a09f198c3
-        handleCloseModal();
-        setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
-        setShowQuestionnaire(true);
+        await handlePostSignIn(data.user.id);
       }
-<<<<<<< HEAD
-    } catch (err: any) {
-      console.error('Error signing in:', err);
-      Alert.alert('Error', err.message || 'Failed to sign in.');
-    } finally {
-      setIsEmailSigningIn(false);
-=======
     } catch (error: any) {
-      if (error.code === 'ERR_REQUEST_CANCELED') {
+      if (error?.code === 'ERR_REQUEST_CANCELED') {
         console.log('User cancelled Apple sign-in');
       } else {
         console.error('Apple Sign-In error:', error);
@@ -392,7 +412,6 @@ export const LoginScreen = () => {
       }
     } finally {
       setIsAppleSigningIn(false);
->>>>>>> 4224f0f1b543a7b61a66113585077f9a09f198c3
     }
   };
 
@@ -507,22 +526,25 @@ export const LoginScreen = () => {
           <View style={styles.logoPlaceholder}>
             <Text style={styles.logoText}>Hustlingo</Text>
           </View>
-          {/* Sneaky Debug Buttons - Remove in production */}
-          <TouchableOpacity
-            onPress={() => setShowHome(true)}
-            style={styles.debugButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.debugButtonText}>🏠</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={handleDevSkipToEnd}
-            style={styles.debugButton}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.debugButtonText}>⏭️</Text>
-          </TouchableOpacity>
-          {/* CreateAccount debug button removed - sign-in is now in questionnaire */}
+          {/* Debug Buttons - dev only */}
+          {__DEV__ && (
+            <>
+              <TouchableOpacity
+                onPress={() => setShowHome(true)}
+                style={styles.debugButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.debugButtonText}>🏠</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleDevSkipToEnd}
+                style={styles.debugButton}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.debugButtonText}>⏭️</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Concentric Circles with Dollar Sign */}
@@ -557,10 +579,10 @@ export const LoginScreen = () => {
               );
             })}
 
-            {/* Center circle with laptop image */}
+            {/* Center circle with mascot */}
             <View style={styles.centerCircle}>
               <Image
-                source={require('../../assets/laptop-icon.png')}
+                source={require('../../assets/dollarEmotes/happyEmote.png')}
                 style={styles.centerImage}
                 resizeMode="contain"
               />
@@ -609,33 +631,32 @@ export const LoginScreen = () => {
         visible={showSignInModal}
         onRequestClose={handleCloseModal}
       >
-        <TouchableWithoutFeedback onPress={handleCloseModal}>
-          <Animated.View
-            style={[
-              styles.modalOverlay,
-              {
-                backgroundColor: fadeAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.5)'],
-                }),
-              }
-            ]}
-          >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-                style={{ width: '100%' }}
-              >
-              <Animated.View
-                style={[
-                  styles.modalContent,
-                  {
-                    paddingBottom: insets.bottom + 20,
-                    transform: [{ translateY: slideAnim }]
-                  }
-                ]}
-              >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <TouchableWithoutFeedback onPress={handleCloseModal}>
+            <Animated.View
+              style={[
+                styles.modalOverlay,
+                {
+                  backgroundColor: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0.5)'],
+                  }),
+                }
+              ]}
+            >
+              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <Animated.View
+                  style={[
+                    styles.modalContent,
+                    {
+                      paddingBottom: insets.bottom + 20,
+                      transform: [{ translateY: slideAnim }]
+                    }
+                  ]}
+                >
                 {/* Header */}
                 <View style={styles.modalHeader}>
                   {emailSignInStep !== 'choose' && (
@@ -665,144 +686,132 @@ export const LoginScreen = () => {
                 {/* Step: Choose sign-in method */}
                 {emailSignInStep === 'choose' && (
                   <>
-                    <View style={styles.modalBody}>
-                      <TouchableOpacity
-                        style={[styles.authButton, isGoogleSigningIn && styles.authButtonDisabled]}
-                        onPress={handleGoogleSignIn}
-                        disabled={isGoogleSigningIn}
-                        activeOpacity={0.7}
-                      >
-                        {isGoogleSigningIn ? (
-                          <ActivityIndicator size="small" color={colors.text.primary} style={styles.authIcon} />
-                        ) : (
-                          <Image
-                            source={require('../../assets/logos/googleLogo.png')}
-                            style={styles.googleLogo}
-                            resizeMode="contain"
-                          />
-                        )}
-                        <Text style={styles.authButtonText}>
-                          {isGoogleSigningIn ? 'Signing in...' : 'Sign in with Google'}
-                        </Text>
-                      </TouchableOpacity>
+<View style={styles.modalBody}>
+  <TouchableOpacity
+    style={[styles.authButton, isGoogleSigningIn && styles.authButtonDisabled]}
+    onPress={handleGoogleSignIn}
+    disabled={isGoogleSigningIn}
+    activeOpacity={0.7}
+  >
+    {isGoogleSigningIn ? (
+      <ActivityIndicator size="small" color={colors.text.primary} style={styles.authIcon} />
+    ) : (
+      <Image
+        source={require('../../assets/logos/googleLogo.png')}
+        style={styles.googleLogo}
+        resizeMode="contain"
+      />
+    )}
+    <Text style={styles.authButtonText}>
+      {isGoogleSigningIn ? 'Signing in...' : 'Sign in with Google'}
+    </Text>
+  </TouchableOpacity>
 
-                      <TouchableOpacity
-                        style={styles.authButton}
-                        onPress={handleEmailSignIn}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
-                        <Text style={styles.authButtonText}>Sign in with Email</Text>
-                      </TouchableOpacity>
-                    </View>
+  {Platform.OS === 'ios' && (
+    <TouchableOpacity
+      style={[styles.authButton, styles.appleButton, isAppleSigningIn && styles.authButtonDisabled]}
+      onPress={handleAppleSignIn}
+      disabled={isAppleSigningIn}
+      activeOpacity={0.7}
+    >
+      {isAppleSigningIn ? (
+        <ActivityIndicator size="small" color="#000000" style={styles.authIcon} />
+      ) : (
+        <Ionicons name="logo-apple" size={20} color="#000000" style={styles.authIcon} />
+      )}
+      <Text style={styles.appleButtonText}>
+        {isAppleSigningIn ? 'Signing in...' : 'Sign in with Apple'}
+      </Text>
+    </TouchableOpacity>
+  )}
 
-                    <View style={styles.modalFooter}>
-                      <Text style={styles.footerText}>
-                        By continuing, you agree to Hustlingo's{' '}
-                        <Text style={styles.footerLink}>Terms and Conditions</Text> and{' '}
-                        <Text style={styles.footerLink}>Privacy Policy</Text>
-                      </Text>
-                    </View>
-                  </>
-                )}
+  <TouchableOpacity
+    style={styles.authButton}
+    onPress={handleEmailSignIn}
+    activeOpacity={0.7}
+  >
+    <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
+    <Text style={styles.authButtonText}>Sign in with Email</Text>
+  </TouchableOpacity>
+</View>ł
 
-                {/* Step: Enter email and password */}
-                {emailSignInStep === 'enterCredentials' && (
-                  <ScrollView
-                    contentContainerStyle={styles.modalBody}
-                    keyboardShouldPersistTaps="handled"
-                    showsVerticalScrollIndicator={false}
-                    bounces={false}
-                  >
-                    <Text style={styles.emailInstructions}>
-                      Enter your email and password to sign in to your account.
-                    </Text>
-<<<<<<< HEAD
-                    <TextInput
-                      style={styles.textInput}
-                      placeholder="Email address"
-                      placeholderTextColor={colors.text.tertiary}
-                      value={emailInput}
-                      onChangeText={setEmailInput}
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      autoComplete="email"
-                      returnKeyType="next"
-                      onSubmitEditing={() => {
-                        passwordInputRef.current?.focus();
-                      }}
-                      editable={!isEmailSigningIn}
-                    />
-                    <TextInput
-                      ref={passwordInputRef}
-                      style={styles.textInput}
-                      placeholder="Password"
-                      placeholderTextColor={colors.text.tertiary}
-                      value={passwordInput}
-                      onChangeText={setPasswordInput}
-                      secureTextEntry
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      returnKeyType="done"
-                      onSubmitEditing={handleEmailPasswordSignIn}
-                      editable={!isEmailSigningIn}
-                    />
-                    <TouchableOpacity
-                      style={[styles.emailSubmitButton, (isEmailSigningIn || !emailInput.trim() || !passwordInput.trim()) && styles.authButtonDisabled]}
-                      onPress={handleEmailPasswordSignIn}
-                      disabled={isEmailSigningIn || !emailInput.trim() || !passwordInput.trim()}
-                      activeOpacity={0.7}
-                    >
-                      {isEmailSigningIn ? (
-                        <ActivityIndicator size="small" color="#000000" />
-                      ) : (
-                        <Text style={styles.emailSubmitButtonText}>Sign in</Text>
-                      )}
-                    </TouchableOpacity>
-                  </ScrollView>
-                )}
-=======
-                  </TouchableOpacity>
-
-                  {Platform.OS === 'ios' && (
-                    <TouchableOpacity
-                      style={[styles.authButton, styles.appleButton, isAppleSigningIn && styles.authButtonDisabled]}
-                      onPress={handleAppleSignIn}
-                      disabled={isAppleSigningIn}
-                      activeOpacity={0.7}
-                    >
-                      {isAppleSigningIn ? (
-                        <ActivityIndicator size="small" color="#000000" style={styles.authIcon} />
-                      ) : (
-                        <Ionicons name="logo-apple" size={20} color="#000000" style={styles.authIcon} />
-                      )}
-                      <Text style={styles.appleButtonText}>
-                        {isAppleSigningIn ? 'Signing in...' : 'Sign in with Apple'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-
-                  <TouchableOpacity style={styles.authButton}>
-                    <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
-                    <Text style={styles.authButtonText}>Sign in with Email</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Footer */}
-                <View style={styles.modalFooter}>
+<View style={styles.modalFooter}>
                   <Text style={styles.footerText}>
                     By continuing, you agree to Hustlingo's{' '}
                     <Text style={styles.footerLink}>Terms and Conditions</Text> and{' '}
                     <Text style={styles.footerLink}>Privacy Policy</Text>
                   </Text>
                 </View>
->>>>>>> 4224f0f1b543a7b61a66113585077f9a09f198c3
-              </Animated.View>
-              </KeyboardAvoidingView>
-            </TouchableWithoutFeedback>
-          </Animated.View>
-        </TouchableWithoutFeedback>
+              </>
+            )}
+
+            {/* Step: Enter email and password */}
+            {emailSignInStep === 'enterCredentials' && (
+              <ScrollView
+                contentContainerStyle={styles.modalBody}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
+                <Text style={styles.emailInstructions}>
+                  Enter your email and password to sign in to your account.
+                </Text>
+
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Email address"
+                  placeholderTextColor={colors.text.tertiary}
+                  value={emailInput}
+                  onChangeText={setEmailInput}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  returnKeyType="next"
+                  onSubmitEditing={() => {
+                    passwordInputRef.current?.focus();
+                  }}
+                  editable={!isEmailSigningIn}
+                />
+
+                <TextInput
+                  ref={passwordInputRef}
+                  style={styles.textInput}
+                  placeholder="Password"
+                  placeholderTextColor={colors.text.tertiary}
+                  value={passwordInput}
+                  onChangeText={setPasswordInput}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={handleEmailPasswordSignIn}
+                  editable={!isEmailSigningIn}
+                />
+
+                <TouchableOpacity
+                  style={[
+                    styles.emailSubmitButton,
+                    (isEmailSigningIn || !emailInput.trim() || !passwordInput.trim()) &&
+                      styles.authButtonDisabled,
+                  ]}
+                  onPress={handleEmailPasswordSignIn}
+                  disabled={isEmailSigningIn || !emailInput.trim() || !passwordInput.trim()}
+                  activeOpacity={0.7}
+                >
+                  {isEmailSigningIn ? (
+                    <ActivityIndicator size="small" color="#000000" />
+                  ) : (
+                    <Text style={styles.emailSubmitButtonText}>Sign in</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+                </Animated.View>
+              </TouchableWithoutFeedback>
+            </Animated.View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -883,18 +892,19 @@ const styles = StyleSheet.create({
     height: 24,
   },
   centerCircle: {
-    width: width * 0.25,
-    height: width * 0.25,
+    width: width * 0.35,
+    height: width * 0.35,
     borderRadius: 9999,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'visible',
   },
   centerImage: {
-    width: 60,
-    height: 60,
+    width: 140,
+    height: 140,
   },
   bottomContainer: {
     backgroundColor: colors.surface,

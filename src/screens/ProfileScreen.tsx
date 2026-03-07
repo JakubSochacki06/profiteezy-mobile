@@ -13,10 +13,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { Card } from '../components/Card';
+import { ReferralModal } from '../components/ReferralModal';
 import { supabase, getUserTotalPoints, fetchStreak } from '../lib/supabase';
 import { User } from '@supabase/supabase-js';
 
 const LEAGUE_IMAGE = require('../../assets/leagues/League1.png');
+
+const AVATAR_COLORS = [
+  '#F472B6', '#FB7185', '#A78BFA', '#FBBF24', '#C084FC',
+  '#FDA4AF', '#34D399', '#FCD34D', '#818CF8', '#F97316',
+];
+
+interface Friend {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  points: number;
+}
 
 export const ProfileScreen = () => {
   const insets = useSafeAreaInsets();
@@ -25,6 +38,8 @@ export const ProfileScreen = () => {
   const [totalXp, setTotalXp] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [showReferral, setShowReferral] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -35,13 +50,20 @@ export const ProfileScreen = () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       if (user) {
-        const [xp, streakData] = await Promise.all([
+        const [xp, streakData, referredFriends] = await Promise.all([
           getUserTotalPoints(user.id),
           fetchStreak(user.id),
+          supabase
+            .from('profiles')
+            .select('id, full_name, email, points')
+            .eq('referred_by', user.id),
         ]);
         setTotalXp(xp);
         setCurrentStreak(streakData.current_streak);
         setLongestStreak(streakData.longest_streak);
+        if (!referredFriends.error && referredFriends.data) {
+          setFriends(referredFriends.data as Friend[]);
+        }
       }
     } catch (error) {
       console.error('Error fetching user:', error);
@@ -78,9 +100,7 @@ export const ProfileScreen = () => {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings-outline" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
+        <View style={styles.settingsButton} />
       </View>
 
       <ScrollView
@@ -145,49 +165,50 @@ export const ProfileScreen = () => {
           <View style={styles.inviteIconContainer}>
             <Image source={require('../../assets/present.png')} style={styles.presentIcon} />
           </View>
-          <View style={styles.inviteContent}>
+          <TouchableOpacity style={styles.inviteContent} onPress={() => setShowReferral(true)} activeOpacity={0.7}>
             <Text style={styles.inviteTitle}>Get 2 weeks of Hustlingo Pro for every friend you invite!</Text>
             <Text style={styles.inviteLink}>Invite friends</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Friends Section */}
         <View style={styles.friendsSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Friends</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowReferral(true)}>
               <Text style={styles.sectionAction}>+ Add friends</Text>
             </TouchableOpacity>
           </View>
 
           <Card style={styles.friendsCard} padding="none" variant="default">
-            {/* Friend Item 1 */}
-            <View style={styles.friendItem}>
-              <View style={styles.friendInfo}>
-                <View style={[styles.friendAvatar, { backgroundColor: '#F472B6' }]}>
-                  <Ionicons name="person" size={20} color="#fff" />
+            {friends.length === 0 ? (
+              <View style={styles.friendItem}>
+                <Text style={styles.noFriendsText}>Invite friends to see them here!</Text>
+              </View>
+            ) : (
+              friends.map((friend, index) => (
+                <View
+                  key={friend.id}
+                  style={[
+                    styles.friendItem,
+                    index === friends.length - 1 && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  <View style={styles.friendInfo}>
+                    <View style={[styles.friendAvatar, { backgroundColor: AVATAR_COLORS[index % AVATAR_COLORS.length] }]}>
+                      <Ionicons name="person" size={20} color="#fff" />
+                    </View>
+                    <Text style={styles.friendName}>
+                      {friend.full_name || friend.email?.split('@')[0] || 'User'}
+                    </Text>
+                  </View>
+                  <View style={styles.friendStats}>
+                    <Ionicons name="flash" size={14} color="#F59E0B" />
+                    <Text style={styles.friendXp}>{friend.points?.toLocaleString() ?? 0}</Text>
+                  </View>
                 </View>
-                <Text style={styles.friendName}>Kuba</Text>
-              </View>
-              <View style={styles.friendStats}>
-                <Ionicons name="flash" size={14} color="#F59E0B" />
-                <Text style={styles.friendXp}>340</Text>
-              </View>
-            </View>
-
-            {/* Friend Item 2 */}
-            <View style={[styles.friendItem, { borderBottomWidth: 0 }]}>
-              <View style={styles.friendInfo}>
-                <View style={[styles.friendAvatar, { backgroundColor: '#34D399' }]}>
-                  <Ionicons name="person" size={20} color="#fff" />
-                </View>
-                <Text style={styles.friendName}>Krupier</Text>
-              </View>
-              <View style={styles.friendStats}>
-                <Ionicons name="flash" size={14} color="#F59E0B" />
-                <Text style={styles.friendXp}>120</Text>
-              </View>
-            </View>
+              ))
+            )}
           </Card>
         </View>
 
@@ -198,6 +219,8 @@ export const ProfileScreen = () => {
         </TouchableOpacity>
 
       </ScrollView>
+
+      <ReferralModal visible={showReferral} onClose={() => setShowReferral(false)} />
     </View>
   );
 };
@@ -396,6 +419,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginLeft: 4,
     fontFamily: 'Inter_700Bold',
+  },
+  noFriendsText: {
+    color: colors.text.secondary,
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
   },
   inviteBanner: {
     marginHorizontal: 20,

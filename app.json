@@ -15,7 +15,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hustlingo.app",
-      "usesAppleSignIn": true
+      "buildNumber": "2",
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "scheme": "hustlingo",
     "android": {
