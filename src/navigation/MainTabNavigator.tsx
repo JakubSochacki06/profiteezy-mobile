@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HomeScreen } from '../screens/HomeScreen';
-import { LeaguesScreen } from '../screens/LeaguesScreen';
+import { ChallengesScreen } from '../screens/ChallengesScreen';
 import { DailyMissionsScreen } from '../screens/DailyMissionsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { colors } from '../theme/colors';
@@ -11,7 +11,7 @@ import { Platform } from 'react-native';
 
 export type MainTabParamList = {
   Home: undefined;
-  Leagues: undefined;
+  Challenges: undefined;
   Missions: undefined;
   Profile: undefined;
 };
@@ -45,7 +45,7 @@ export const MainTabNavigator = () => {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Leagues') {
+          } else if (route.name === 'Challenges') {
             iconName = focused ? 'trophy' : 'trophy-outline';
           } else if (route.name === 'Missions') {
             iconName = focused ? 'checkbox' : 'checkbox-outline';
@@ -71,11 +71,11 @@ export const MainTabNavigator = () => {
           tabBarStyle: defaultTabBarStyle,
         }}
       />
-      <Tab.Screen
-        name="Leagues"
-        component={LeaguesScreen}
+      <Tab.Screen 
+        name="Challenges" 
+        component={ChallengesScreen}
         options={{
-          tabBarLabel: 'Leagues',
+          tabBarLabel: 'Leaderboard',
           tabBarStyle: defaultTabBarStyle,
         }}
       />
