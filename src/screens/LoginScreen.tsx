@@ -91,50 +91,54 @@ export const LoginScreen = () => {
   // Check if user is already signed in and has an active subscription
   useEffect(() => {
     const checkAuthAndSubscription = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
+      // Timeout after 8 seconds to prevent infinite loading if network is unreachable
+      const timeout = new Promise<void>((resolve) => setTimeout(resolve, 8000));
+      const check = async () => {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
 
-        if (session?.user) {
-          // User is signed in — check subscription status in profiles table
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('subscription_status, subscription_expires_at')
-            .eq('id', session.user.id)
-            .single();
+          if (session?.user) {
+            // User is signed in — check subscription status in profiles table
+            const { data: profile, error } = await supabase
+              .from('profiles')
+              .select('subscription_status, subscription_expires_at')
+              .eq('id', session.user.id)
+              .single();
 
-          if (!error && profile) {
-            const isActive = profile.subscription_status === 'active';
-            const isExpired = profile.subscription_expires_at
-              ? new Date(profile.subscription_expires_at) < new Date()
-              : false;
+            if (!error && profile) {
+              const isActive = profile.subscription_status === 'active';
+              const isExpired = profile.subscription_expires_at
+                ? new Date(profile.subscription_expires_at) < new Date()
+                : false;
 
-            if (isActive && !isExpired) {
-              // Active subscription — go straight to home
-              console.log('User has active subscription, skipping to home');
-              setShowHome(true);
-              setIsCheckingAuth(false);
-              return;
+              if (isActive && !isExpired) {
+                // Active subscription — go straight to home
+                console.log('User has active subscription, skipping to home');
+                setShowHome(true);
+                return;
+              }
+
+              // Subscription is inactive or expired — update status if expired
+              if (isActive && isExpired) {
+                console.log('Subscription expired, updating status');
+                await supabase
+                  .from('profiles')
+                  .update({ subscription_status: 'inactive', updated_at: new Date().toISOString() })
+                  .eq('id', session.user.id);
+              }
             }
 
-            // Subscription is inactive or expired — update status if expired
-            if (isActive && isExpired) {
-              console.log('Subscription expired, updating status');
-              await supabase
-                .from('profiles')
-                .update({ subscription_status: 'inactive', updated_at: new Date().toISOString() })
-                .eq('id', session.user.id);
-            }
+            // User is signed in but no active subscription — sign out and show start of app
+            console.log('User signed in but subscription inactive/expired, signing out and showing start');
+            await supabase.auth.signOut();
           }
-
-          // User is signed in but no active subscription — sign out and show start of app
-          console.log('User signed in but subscription inactive/expired, signing out and showing start');
-          await supabase.auth.signOut();
+        } catch (err) {
+          console.error('Error checking auth/subscription:', err);
         }
-      } catch (err) {
-        console.error('Error checking auth/subscription:', err);
-      } finally {
-        setIsCheckingAuth(false);
-      }
+      };
+
+      await Promise.race([check(), timeout]);
+      setIsCheckingAuth(false);
     };
 
     checkAuthAndSubscription();
