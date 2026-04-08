@@ -290,17 +290,19 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
         ref={scrollViewRef}
         contentContainerStyle={[
           styles.contentContainer,
-          // Add extra padding at bottom if modal is visible so content isn't covered?
-          // Reduced padding as requested
-          { paddingBottom: getBottomPadding() } 
+          { paddingBottom: getBottomPadding() },
+          // Center content vertically for text-only pages
+          stageType === 'text_only' && styles.contentContainerCentered,
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <MarkdownDisplay content={currentStage.content} />
+        {currentStage.content ? (
+          <MarkdownDisplay content={currentStage.content} />
+        ) : null}
 
         {/* Render inline task if this is a text+task stage */}
         {stageType === 'text_with_task' && (
-          <View style={styles.taskContainer}>
+          <View style={currentStage.content ? styles.taskContainer : styles.taskContainerNoContent}>
             {renderTask()}
           </View>
         )}
@@ -446,6 +448,10 @@ const styles = StyleSheet.create({
     padding: 24,
     // paddingBottom is dynamic now
   },
+  contentContainerCentered: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
   title: {
     fontSize: 28,
     fontWeight: '800',
@@ -456,9 +462,9 @@ const styles = StyleSheet.create({
   },
   taskContainer: {
     marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  },
+  taskContainerNoContent: {
+    // No top margin/border when there's no content above the task
   },
   footer: {
     paddingHorizontal: 24,

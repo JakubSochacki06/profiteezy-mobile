@@ -125,7 +125,7 @@ export const MarkdownDisplay: React.FC<MarkdownDisplayProps> = ({ content }) => 
         {parts.map((part, index) => {
           if (part.startsWith('**') && part.endsWith('**')) {
             return (
-              <Text key={index} style={{ fontWeight: 'bold', color: colors.text.primary }}>
+              <Text key={index} style={{ fontWeight: 'bold', color: colors.accent }}>
                 {part.slice(2, -2)}
               </Text>
             );
@@ -198,7 +198,7 @@ export const MarkdownDisplay: React.FC<MarkdownDisplayProps> = ({ content }) => 
                 <Image 
                   source={{ uri: block.content as string }} 
                   style={styles.image} 
-                  resizeMode="cover"
+                  resizeMode="contain"
                 />
                 {block.metadata?.alt && (
                     <Text style={styles.imageCaption}>{block.metadata.alt}</Text>
@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
   paragraph: {
     fontSize: 16,
     lineHeight: 26,
-    color: colors.text.secondary,
+    color: colors.text.primary,
     fontFamily: 'Inter_400Regular',
   },
   blockquote: {
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontStyle: 'italic',
-    color: colors.text.tertiary,
+    color: colors.text.primary,
     lineHeight: 24,
   },
   listContainer: {
@@ -363,11 +363,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     lineHeight: 26,
-    color: colors.text.secondary,
+    color: colors.text.primary,
     fontFamily: 'Inter_400Regular',
   },
   imageContainer: {
     marginVertical: 24,
+    paddingVertical: 12,
     borderRadius: 16,
     overflow: 'hidden',
     backgroundColor: colors.surface,
@@ -377,6 +378,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 16 / 9,
     backgroundColor: colors.surface,
+    resizeMode: 'contain',
   },
   imageCaption: {
     marginTop: 8,
