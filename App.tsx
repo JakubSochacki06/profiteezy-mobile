@@ -1,8 +1,9 @@
 import React, { useEffect, Component } from 'react';
-import { Linking, View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { SuperwallProvider, useSuperwall } from 'expo-superwall';
+import type { SubscriptionStatus } from 'expo-superwall';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { supabase } from './src/lib/supabase';
 
@@ -62,11 +63,8 @@ function DeepLinkHandler() {
   const superwall = useSuperwall();
 
   useEffect(() => {
-    // Initialize Superwall subscription status from Supabase profile.
-    // This avoids resetting paid users back to INACTIVE on every app launch.
     const initializeSubscriptionStatus = async () => {
       try {
-        // Race against a 6-second timeout so Superwall is never left uninitialized
         const timeout = new Promise<void>((resolve) => setTimeout(resolve, 6000));
         const init = async () => {
           const { data: { session } } = await supabase.auth.getSession();
@@ -93,9 +91,11 @@ function DeepLinkHandler() {
             ? new Date(profile.subscription_expires_at) < new Date()
             : false;
 
-          await superwall.setSubscriptionStatus({
-            status: isActive && !isExpired ? 'ACTIVE' : 'INACTIVE',
-          });
+          const status: SubscriptionStatus = isActive && !isExpired
+            ? { status: 'ACTIVE', entitlements: [] }
+            : { status: 'INACTIVE' };
+
+          await superwall.setSubscriptionStatus(status);
         };
 
         await Promise.race([init(), timeout]);
@@ -108,45 +108,6 @@ function DeepLinkHandler() {
     };
 
     initializeSubscriptionStatus();
-
-    // Handle deep links when app is opened from a closed state
-    const handleInitialUrl = async () => {
-      const url = await Linking.getInitialURL();
-      if (url && superwall.handleDeepLink) {
-        try {
-          await superwall.handleDeepLink(url);
-        } catch (error) {
-          // handleDeepLink may return false for non-Superwall links, which is expected
-          // Only log actual errors
-          if (error && typeof error !== 'boolean') {
-            console.error('Initial deep link error:', error);
-          }
-        }
-      }
-    };
-
-    // Handle deep links when app is already running
-    const handleUrl = async (event: { url: string }) => {
-      if (superwall.handleDeepLink) {
-        try {
-          await superwall.handleDeepLink(event.url);
-        } catch (error) {
-          // handleDeepLink may return false for non-Superwall links, which is expected
-          if (error && typeof error !== 'boolean') {
-            console.error('Deep link error:', error);
-          }
-        }
-      }
-    };
-
-    handleInitialUrl();
-
-    // Listen for deep links while app is running
-    const subscription = Linking.addEventListener('url', handleUrl);
-
-    return () => {
-      subscription.remove();
-    };
   }, [superwall]);
 
   return null;

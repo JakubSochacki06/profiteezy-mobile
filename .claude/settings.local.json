@@ -7,7 +7,16 @@
       "Bash(git -C C:/Users/jsoch/Desktop/profiteezy-mobile apply -)",
       "WebSearch",
       "Bash(npx tsc:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git add:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(npx expo config:*)",
+      "Bash(git stash push:*)",
+      "Bash(git reset:*)",
+      "Bash(eas whoami:*)",
+      "Bash(npx eas-cli whoami:*)"
     ]
   },
   "disabledMcpjsonServers": [
