@@ -69,6 +69,18 @@ export const PersonalPlanScreen: React.FC<Props> = ({
         return false;
       }
 
+      // Verify the update actually hit a row — update returns no error even if 0 rows matched.
+      const { data: verifiedProfile, error: readError } = await supabase
+        .from('profiles')
+        .select('subscription_status')
+        .eq('id', session.user.id)
+        .single();
+
+      if (readError || !verifiedProfile || verifiedProfile.subscription_status !== 'active') {
+        console.error('[PAYWALL] Update ran but profile not found or status not active. Profile may not exist.');
+        return false;
+      }
+
       await superwall.setSubscriptionStatus({ status: 'ACTIVE', entitlements: [] });
       console.log('[PAYWALL] Premium activated in Supabase for user:', session.user.id);
       return true;
@@ -99,12 +111,21 @@ export const PersonalPlanScreen: React.FC<Props> = ({
         onContinue();
       }
     },
-    onSkip: (reason) => {
-      // Let subscribed users through; block misconfigured placements.
-      if (reason.type === 'UserIsSubscribed' || reason.type === 'feature_callback') {
-        onContinue();
+    onSkip: async (reason) => {
+      // Only let already-subscribed users through — verify in Supabase first.
+      if (reason.type === 'UserIsSubscribed') {
+        const activated = await activatePremiumInSupabase();
+        if (activated) {
+          onContinue();
+        } else {
+          Alert.alert(
+            'Subscription verification failed',
+            'We could not confirm your subscription. Please restart the app and try again.'
+          );
+        }
         return;
       }
+      // All other skip reasons (including feature_callback, holdout, etc.) must NOT grant access.
       console.error('[PAYWALL] Skipped with non-subscribed reason:', reason.type);
       Alert.alert(
         'Paywall not available',

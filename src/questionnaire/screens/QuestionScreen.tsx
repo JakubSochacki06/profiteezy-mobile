@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { colors } from '../../theme/colors';
 import { Question } from '../types';
@@ -30,6 +30,19 @@ export const QuestionScreen: React.FC<QuestionScreenProps> = ({
         : []
     )
   );
+
+  // Reset selection when navigating to a different question (no key remount needed)
+  useEffect(() => {
+    setSelectedAnswers(
+      new Set(
+        initialSelection
+          ? Array.isArray(initialSelection)
+            ? initialSelection
+            : [initialSelection]
+          : []
+      )
+    );
+  }, [question.id]);
 
   const handleAnswerPress = (answerId: string) => {
     if (question.multiSelect) {

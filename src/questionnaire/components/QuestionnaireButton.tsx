@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
 import { Button } from '../../components/Button';
 
@@ -14,8 +15,10 @@ export const QuestionnaireButton: React.FC<QuestionnaireButtonProps> = ({
   disabled = false,
   text = 'Continue',
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingBottom: insets.bottom + 16 }]}>
       <Button
         title={text}
         onPress={onPress}
@@ -32,7 +35,6 @@ const styles = StyleSheet.create({
   container: {
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 90,
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,

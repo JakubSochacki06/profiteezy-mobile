@@ -9,7 +9,7 @@ export const questionnaireData: QuestionnaireData = {
   welcome: {
     image: require('../../assets/questionnaire/welcomeImage.jpg'), // Replace with your welcome image
     title: '28-Day Money Challenge',
-    subtitle: 'start making money online',
+    subtitle: 'Change your life forever and start becoming financially free.',
     buttonText: 'Get Started',
     termsText: 'By proceeding you agree with our Terms & Conditions, Privacy Policy, Subscription Terms',
   },

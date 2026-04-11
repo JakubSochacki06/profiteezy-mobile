@@ -128,9 +128,6 @@ export const ProfileScreen = () => {
             {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
           </Text>
 
-          <TouchableOpacity style={styles.addBioButton}>
-            <Text style={styles.addBioText}>+ Add Bio</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Stats Grid */}
@@ -145,7 +142,7 @@ export const ProfileScreen = () => {
 
           <View style={[styles.statCard, styles.statCardCenter]}>
             <View style={styles.statIconContainer}>
-              <Ionicons name="flash" size={24} color="#F59E0B" />
+              <Text style={styles.xpDollarIcon}>$</Text>
             </View>
             <Text style={styles.statValue}>{totalXp.toLocaleString()}</Text>
             <Text style={styles.statLabel}>XP</Text>
@@ -295,16 +292,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontFamily: 'Inter_700Bold',
   },
-  addBioButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 12,
-  },
-  addBioText: {
-    color: colors.text.secondary,
-    fontSize: 16,
-    fontWeight: '500',
-    fontFamily: 'Inter_500Medium',
-  },
   statsGrid: {
     flexDirection: 'row',
     paddingHorizontal: 20,
@@ -329,6 +316,12 @@ const styles = StyleSheet.create({
   },
   statIconContainer: {
     marginBottom: 8,
+  },
+  xpDollarIcon: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.accent,
+    fontFamily: 'Inter_700Bold',
   },
   streakIcon: {
     width: 24,

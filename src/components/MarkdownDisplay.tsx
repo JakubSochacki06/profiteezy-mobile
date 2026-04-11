@@ -87,10 +87,10 @@ export const MarkdownDisplay: React.FC<MarkdownDisplayProps> = ({ content }) => 
             if (currentList.length > 0) { blocks.push({ type: 'list_unordered', content: [...currentList] }); currentList = []; }
             blocks.push({ type: 'blockquote', content: line.substring(2).trim() });
           }
-          // Images
-          else if (line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)) {
+          // Images — use greedy match for URL to handle parentheses within the URL (e.g. "file%20(1).png")
+          else if (line.match(/^!\[([^\]]*)\]\((.+)\)\s*$/)) {
             if (currentList.length > 0) { blocks.push({ type: 'list_unordered', content: [...currentList] }); currentList = []; }
-            const match = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+            const match = line.match(/^!\[([^\]]*)\]\((.+)\)\s*$/);
             if (match) {
               blocks.push({ type: 'image', content: match[2], metadata: { alt: match[1] } });
             }

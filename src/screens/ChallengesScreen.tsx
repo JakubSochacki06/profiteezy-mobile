@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -32,10 +32,28 @@ const LEAGUES = [
   { id: 'diamond', name: 'Diamond', image: LEAGUE_IMAGES.league5, locked: true, active: false },
 ];
 
+const getTimeUntilEndOfMonth = () => {
+  const now = new Date();
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+  const diff = endOfMonth.getTime() - now.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  return `${days}d ${hours}h ${minutes}m`;
+};
+
 export const ChallengesScreen = () => {
   const insets = useSafeAreaInsets();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [timer, setTimer] = useState(getTimeUntilEndOfMonth);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimer(getTimeUntilEndOfMonth());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,7 +93,7 @@ export const ChallengesScreen = () => {
 
       <View style={styles.leagueInfoRow}>
         <Text style={styles.leagueName}>Stone League</Text>
-        <Text style={styles.timerText}>30d 0h 0m</Text>
+        <Text style={styles.timerText}>{timer}</Text>
       </View>
     </View>
   );

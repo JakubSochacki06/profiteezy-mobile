@@ -3,17 +3,18 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   Image,
   Alert,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { colors } from '../../theme/colors';
 import { SignInScreenData } from '../types';
 import { QuestionnaireScreenWrapper } from '../components';
+import { Button } from '../../components/Button';
 import {
   GoogleSignin,
   isSuccessResponse,
@@ -38,11 +39,11 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
   currentStep,
   totalSteps,
 }) => {
+  const insets = useSafeAreaInsets();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isAppleSigningIn, setIsAppleSigningIn] = useState(false);
   const superwall = useSuperwall();
 
-  // Auto-skip if user is already signed in (e.g. from "I already have an account")
   useEffect(() => {
     const checkExistingAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -68,7 +69,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           throw new Error('No ID token returned from Google Sign-In');
         }
 
-        // Sign in with Supabase
         const { data: authData, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: idToken,
@@ -88,7 +88,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           console.log('[CREATE ACCOUNT] Full name:', authData.user.user_metadata?.full_name);
           console.log('[CREATE ACCOUNT] Avatar URL:', authData.user.user_metadata?.avatar_url);
 
-          // Link Superwall to the authenticated user before saving profile metadata.
           try {
             await superwall.identify(authData.user.id);
             console.log('[CREATE ACCOUNT] ✅ Superwall identified with user ID');
@@ -96,7 +95,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
             console.warn('[CREATE ACCOUNT] ⚠️ Could not identify Superwall user:', e);
           }
 
-          // Upsert profile (subscription_status stays inactive until paywall)
           const profileData = {
             id: authData.user.id,
             email: authData.user.email ?? null,
@@ -116,7 +114,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
             console.error('[CREATE ACCOUNT] ❌ Profile upsert FAILED:', profileResult.error);
           }
 
-          // Verify: read back the profile from Supabase
           try {
             const { data: savedProfile, error: readError } = await supabase
               .from('profiles')
@@ -136,7 +133,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           console.log('[CREATE ACCOUNT] ✅ Account creation complete, continuing questionnaire');
           console.log('========================================');
 
-          // Continue to next questionnaire step
           onContinue();
         }
       }
@@ -204,8 +200,6 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           console.warn('[CREATE ACCOUNT] ⚠️ Could not identify Superwall user:', e);
         }
 
-        // Apple only provides the user's full name on the very first sign-in.
-        // Save it to Supabase Auth user metadata immediately if available.
         let fullName: string | null = authData.user.user_metadata?.full_name ?? null;
         if (credential.fullName) {
           const nameParts = [];
@@ -262,6 +256,26 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
     }
   };
 
+  const googleIcon = (
+    <Image
+      source={require('../../../assets/logos/googleLogo.png')}
+      style={styles.googleLogo}
+      resizeMode="contain"
+    />
+  );
+
+  const googleLoader = (
+    <ActivityIndicator size="small" color={colors.background} />
+  );
+
+  const appleIcon = (
+    <Ionicons name="logo-apple" size={20} color="#000000" />
+  );
+
+  const appleLoader = (
+    <ActivityIndicator size="small" color="#000000" />
+  );
+
   return (
     <QuestionnaireScreenWrapper
       currentStep={currentStep}
@@ -271,11 +285,8 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
       hideButton
     >
       <View style={styles.content}>
-        {/* Top section with icon and text */}
         <View style={styles.topSection}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.iconText}>🎉</Text>
-          </View>
+          <Text style={styles.iconText}>🎉</Text>
           <Text style={styles.title}>
             {data.title || 'Create your account'}
           </Text>
@@ -284,44 +295,31 @@ export const SignInScreen: React.FC<SignInScreenProps> = ({
           </Text>
         </View>
 
-        {/* Sign in button */}
-        <View style={styles.buttonSection}>
-          <TouchableOpacity
-            style={[styles.googleButton, isSigningIn && styles.googleButtonDisabled]}
+        <View style={[styles.buttonSection, { paddingBottom: insets.bottom + 16 }]}>
+          <Button
+            title={isSigningIn ? 'Signing in...' : 'Sign in with Google'}
             onPress={handleGoogleSignIn}
+            variant="primary"
+            size="large"
+            fullWidth
             disabled={isSigningIn}
-            activeOpacity={0.7}
-          >
-            {isSigningIn ? (
-              <ActivityIndicator size="small" color={colors.text.primary} style={styles.buttonIcon} />
-            ) : (
-              <Image
-                source={require('../../../assets/logos/googleLogo.png')}
-                style={styles.googleLogo}
-                resizeMode="contain"
-              />
-            )}
-            <Text style={styles.googleButtonText}>
-              {isSigningIn ? 'Signing in...' : 'Sign in with Google'}
-            </Text>
-          </TouchableOpacity>
+            loading={isSigningIn}
+            leftIcon={!isSigningIn ? googleIcon : undefined}
+          />
 
           {Platform.OS === 'ios' && (
-            <TouchableOpacity
-              style={[styles.appleButton, isAppleSigningIn && styles.googleButtonDisabled]}
-              onPress={handleAppleSignIn}
-              disabled={isAppleSigningIn}
-              activeOpacity={0.7}
-            >
-              {isAppleSigningIn ? (
-                <ActivityIndicator size="small" color="#000000" style={styles.buttonIcon} />
-              ) : (
-                <Ionicons name="logo-apple" size={20} color="#000000" style={styles.buttonIcon} />
-              )}
-              <Text style={styles.appleButtonText}>
-                {isAppleSigningIn ? 'Signing in...' : 'Sign in with Apple'}
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.appleButtonWrapper}>
+              <Button
+                title={isAppleSigningIn ? 'Signing in...' : 'Sign in with Apple'}
+                onPress={handleAppleSignIn}
+                variant="secondary"
+                size="large"
+                fullWidth
+                disabled={isAppleSigningIn}
+                loading={isAppleSigningIn}
+                leftIcon={!isAppleSigningIn ? appleIcon : undefined}
+              />
+            </View>
           )}
 
           <Text style={styles.footerText}>
@@ -339,7 +337,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingBottom: 32,
   },
   topSection: {
     flex: 1,
@@ -347,19 +344,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 32,
   },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   iconText: {
-    fontSize: 36,
+    fontSize: 48,
+    marginBottom: 20,
   },
   title: {
     fontSize: 28,
@@ -377,47 +364,14 @@ const styles = StyleSheet.create({
   },
   buttonSection: {
     paddingHorizontal: 24,
+    gap: 0,
   },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accent,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    marginBottom: 16,
-  },
-  googleButtonDisabled: {
-    opacity: 0.6,
-  },
-  buttonIcon: {
-    marginRight: 12,
+  appleButtonWrapper: {
+    marginTop: 12,
   },
   googleLogo: {
     width: 20,
     height: 20,
-    marginRight: 12,
-  },
-  googleButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#000000',
-  },
-  appleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    marginBottom: 16,
-  },
-  appleButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
-    color: '#000000',
   },
   footerText: {
     fontSize: 12,
@@ -425,6 +379,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     lineHeight: 18,
+    marginTop: 16,
   },
   footerLink: {
     textDecorationLine: 'underline',

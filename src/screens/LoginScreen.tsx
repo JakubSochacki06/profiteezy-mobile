@@ -88,6 +88,17 @@ export const LoginScreen = () => {
   const slideAnim = useRef(new Animated.Value(height)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // Listen for sign-out and return to login screen
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setShowHome(false);
+        setShowQuestionnaire(false);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Check if user is already signed in and has an active subscription
   useEffect(() => {
     const checkAuthAndSubscription = async () => {
@@ -227,12 +238,21 @@ export const LoginScreen = () => {
         setShowHome(true);
         return;
       }
+
+      // Profile exists but no active subscription — send to paywall
+      handleCloseModal();
+      setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
+      setShowQuestionnaire(true);
+      return;
     }
 
-    // No active subscription — send to paywall
-    handleCloseModal();
-    setQuestionnaireStartIndex(questionnaireData.questions.length - 1);
-    setShowQuestionnaire(true);
+    // No profile found — this is a new account, not an existing one.
+    // Sign them out and prompt to use Get Started instead.
+    await supabase.auth.signOut();
+    Alert.alert(
+      'No Account Found',
+      "We couldn't find an existing account linked to this sign-in. Please use \"Get Started\" to create a new account."
+    );
   };
 
   const handleGoogleSignIn = async () => {
@@ -527,9 +547,11 @@ export const LoginScreen = () => {
       <SafeAreaView style={styles.safeArea}>
         {/* Header with App Name Placeholder */}
         <View style={styles.header}>
-          <View style={styles.logoPlaceholder}>
-            <Text style={styles.logoText}>Hustlingo</Text>
-          </View>
+          {__DEV__ && (
+            <View style={styles.logoPlaceholder}>
+              <Text style={styles.logoText}>Hustlingo</Text>
+            </View>
+          )}
           {/* Debug Buttons - dev only */}
           {__DEV__ && (
             <>
@@ -583,8 +605,8 @@ export const LoginScreen = () => {
               );
             })}
 
-            {/* Center circle with mascot */}
-            <View style={styles.centerCircle}>
+            {/* Center mascot */}
+            <View style={styles.centerMascot}>
               <Image
                 source={require('../../assets/dollarEmotes/happyEmote.png')}
                 style={styles.centerImage}
@@ -599,7 +621,7 @@ export const LoginScreen = () => {
           <Text style={styles.mainTitle}>
             <Text style={styles.titleBold}>Start Earning Money </Text>
             <Text style={styles.titleItalic}>online </Text>
-            <Text style={styles.titleAccent}>Now</Text>
+            <Text style={styles.titleAccent}>NOW</Text>
           </Text>
         </View>
 
@@ -895,15 +917,9 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   },
-  centerCircle: {
-    width: width * 0.35,
-    height: width * 0.35,
-    borderRadius: 9999,
-    backgroundColor: colors.surface,
+  centerMascot: {
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
     overflow: 'visible',
   },
   centerImage: {
@@ -936,6 +952,8 @@ const styles = StyleSheet.create({
   titleAccent: {
     fontFamily: 'Inter_700Bold',
     color: colors.accent,
+    textDecorationLine: 'underline',
+    textDecorationColor: colors.accent,
   },
   // getStartedButton styles removed - now using Button component
   signInText: {

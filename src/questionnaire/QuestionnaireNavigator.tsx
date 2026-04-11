@@ -179,7 +179,6 @@ export const QuestionnaireNavigator: React.FC<QuestionnaireNavigatorProps> = ({
   // Otherwise render question screen
   return (
     <QuestionScreen
-      key={currentStep.id}
       question={currentStep}
       currentStep={currentIndex + 1}
       totalSteps={totalSteps}
