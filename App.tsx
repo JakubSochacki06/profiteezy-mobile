@@ -131,6 +131,10 @@ export default function App() {
             level: 'warn',
             scopes: ['all'],
           },
+          paywalls: {
+            shouldShowPurchaseFailureAlert: false,
+            shouldShowWebPurchaseConfirmationAlert: false,
+          },
         }}
       >
         <SafeAreaProvider>
