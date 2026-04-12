@@ -2,7 +2,7 @@ import React, { useEffect, Component } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
-import { SuperwallProvider, useSuperwall } from 'expo-superwall';
+import { SuperwallProvider, useSuperwall, SuperwallExpoModule } from 'expo-superwall';
 import type { SubscriptionStatus } from 'expo-superwall';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { supabase } from './src/lib/supabase';
@@ -59,18 +59,21 @@ const errorStyles = StyleSheet.create({
 // Component to handle deep links and subscription status initialization
 // Note: The SDK may handle some deep links automatically, but we set this up
 // to ensure all deep links are properly routed to Superwall
-function DeepLinkHandler() {
-  const superwall = useSuperwall();
+function SubscriptionStatusInitializer() {
+  const setSubscriptionStatus = useSuperwall(s => s.setSubscriptionStatus);
 
   useEffect(() => {
+    let cancelled = false;
+
     const initializeSubscriptionStatus = async () => {
       try {
         const timeout = new Promise<void>((resolve) => setTimeout(resolve, 6000));
         const init = async () => {
           const { data: { session } } = await supabase.auth.getSession();
+          if (cancelled) return;
 
           if (!session?.user) {
-            await superwall.setSubscriptionStatus({ status: 'INACTIVE' });
+            await setSubscriptionStatus({ status: 'INACTIVE' });
             return;
           }
 
@@ -80,9 +83,11 @@ function DeepLinkHandler() {
             .eq('id', session.user.id)
             .single();
 
+          if (cancelled) return;
+
           if (error) {
             console.error('Failed to read profile for subscription status:', error);
-            await superwall.setSubscriptionStatus({ status: 'INACTIVE' });
+            await setSubscriptionStatus({ status: 'INACTIVE' });
             return;
           }
 
@@ -95,20 +100,23 @@ function DeepLinkHandler() {
             ? { status: 'ACTIVE', entitlements: [] }
             : { status: 'INACTIVE' };
 
-          await superwall.setSubscriptionStatus(status);
+          await setSubscriptionStatus(status);
         };
 
         await Promise.race([init(), timeout]);
       } catch (error) {
         console.error('Failed to initialize subscription status:', error);
-        try {
-          await superwall.setSubscriptionStatus({ status: 'INACTIVE' });
-        } catch (_) {}
+        if (!cancelled) {
+          try { await setSubscriptionStatus({ status: 'INACTIVE' }); } catch (_) {}
+        }
       }
     };
 
     initializeSubscriptionStatus();
-  }, [superwall]);
+    SuperwallExpoModule.setInterfaceStyle('DARK');
+
+    return () => { cancelled = true; };
+  }, [setSubscriptionStatus]);
 
   return null;
 }
@@ -117,7 +125,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <SuperwallProvider
-        apiKeys={{ ios: "pk_1XJ62ooPiSXsAdIGSOkT_", android: "pk_1XJ62ooPiSXsAdIGSOkT_" }}
+        apiKeys={{ ios: "pk_-w27jLL0CBIyfAFdcSG3Z", android: "pk_1XJ62ooPiSXsAdIGSOkT_" }}
         options={{
           logging: {
             level: 'warn',
@@ -127,7 +135,7 @@ export default function App() {
       >
         <SafeAreaProvider>
           <NavigationContainer>
-            <DeepLinkHandler />
+            <SubscriptionStatusInitializer />
             <LoginScreen />
           </NavigationContainer>
         </SafeAreaProvider>

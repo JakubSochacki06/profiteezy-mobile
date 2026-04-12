@@ -111,26 +111,12 @@ export const PersonalPlanScreen: React.FC<Props> = ({
         onContinue();
       }
     },
-    onSkip: async (reason) => {
-      // Only let already-subscribed users through — verify in Supabase first.
-      if (reason.type === 'UserIsSubscribed') {
-        const activated = await activatePremiumInSupabase();
-        if (activated) {
-          onContinue();
-        } else {
-          Alert.alert(
-            'Subscription verification failed',
-            'We could not confirm your subscription. Please restart the app and try again.'
-          );
-        }
+    onSkip: (reason) => {
+      if (reason.type === 'UserIsSubscribed' || reason.type === 'feature_callback') {
+        onContinue();
         return;
       }
-      // All other skip reasons (including feature_callback, holdout, etc.) must NOT grant access.
-      console.error('[PAYWALL] Skipped with non-subscribed reason:', reason.type);
-      Alert.alert(
-        'Paywall not available',
-        'We could not verify subscription access. Please restart the app and try again.'
-      );
+      console.warn('[PAYWALL] Skipped with reason:', reason.type);
     },
   });
 
