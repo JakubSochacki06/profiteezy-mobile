@@ -97,7 +97,7 @@ function SubscriptionStatusInitializer() {
             : false;
 
           const status: SubscriptionStatus = isActive && !isExpired
-            ? { status: 'ACTIVE', entitlements: [] }
+            ? { status: 'ACTIVE', entitlements: [{ id: 'pro', type: 'SERVICE_LEVEL' }] }
             : { status: 'INACTIVE' };
 
           await setSubscriptionStatus(status);

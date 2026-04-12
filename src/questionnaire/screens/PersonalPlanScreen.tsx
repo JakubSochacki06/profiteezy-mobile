@@ -81,7 +81,7 @@ export const PersonalPlanScreen: React.FC<Props> = ({
         return false;
       }
 
-      await superwall.setSubscriptionStatus({ status: 'ACTIVE', entitlements: [] });
+      await superwall.setSubscriptionStatus({ status: 'ACTIVE', entitlements: [{ id: 'pro', type: 'SERVICE_LEVEL' }] });
       console.log('[PAYWALL] Premium activated in Supabase for user:', session.user.id);
       return true;
     } catch (error) {
