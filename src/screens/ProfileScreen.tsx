@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  Modal,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -40,6 +41,8 @@ export const ProfileScreen = () => {
   const [longestStreak, setLongestStreak] = useState(0);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [showReferral, setShowReferral] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     fetchProfile();
@@ -93,6 +96,64 @@ export const ProfileScreen = () => {
     );
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all associated data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you absolutely sure?',
+              'All your progress, points, and data will be lost forever.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, Delete My Account',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      setDeletingAccount(true);
+                      setShowSettings(false);
+
+                      // Delete user data rows first (profile, progress, etc.)
+                      if (user) {
+                        await Promise.allSettled([
+                          supabase.from('profiles').delete().eq('id', user.id),
+                          supabase.from('user_lesson_progress').delete().eq('user_id', user.id),
+                          supabase.from('user_daily_missions').delete().eq('user_id', user.id),
+                        ]);
+
+                        // Call RPC to delete the auth user (requires a DB function)
+                        // CREATE OR REPLACE FUNCTION delete_user()
+                        // RETURNS void LANGUAGE sql SECURITY DEFINER AS
+                        // $$ DELETE FROM auth.users WHERE id = auth.uid(); $$;
+                        const { error: rpcError } = await supabase.rpc('delete_user');
+                        if (rpcError) {
+                          console.error('RPC delete_user error:', rpcError);
+                        }
+                      }
+
+                      await supabase.auth.signOut();
+                    } catch (error) {
+                      console.error('Error deleting account:', error);
+                      Alert.alert('Error', 'Failed to delete account. Please try again or contact support.');
+                    } finally {
+                      setDeletingAccount(false);
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={colors.background} />
@@ -100,7 +161,9 @@ export const ProfileScreen = () => {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.settingsButton} />
+        <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettings(true)} activeOpacity={0.7}>
+          <Ionicons name="settings-outline" size={24} color={colors.text.secondary} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -218,6 +281,39 @@ export const ProfileScreen = () => {
       </ScrollView>
 
       <ReferralModal visible={showReferral} onClose={() => setShowReferral(false)} />
+
+      {/* Settings Modal */}
+      <Modal
+        visible={showSettings}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowSettings(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Settings</Text>
+              <TouchableOpacity onPress={() => setShowSettings(false)} activeOpacity={0.7}>
+                <Ionicons name="close" size={24} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalDivider} />
+
+            <TouchableOpacity
+              style={styles.deleteAccountButton}
+              onPress={handleDeleteAccount}
+              activeOpacity={0.7}
+              disabled={deletingAccount}
+            >
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
+              <Text style={styles.deleteAccountText}>
+                {deletingAccount ? 'Deleting...' : 'Delete Account'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -243,6 +339,8 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollView: {
     flex: 1,
@@ -464,6 +562,51 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logOutText: {
+    color: '#EF4444',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    fontFamily: 'Inter_700Bold',
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    marginBottom: 16,
+  },
+  deleteAccountButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderRadius: 12,
+  },
+  deleteAccountText: {
     color: '#EF4444',
     fontSize: 16,
     fontWeight: '600',

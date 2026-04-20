@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
@@ -22,6 +22,27 @@ interface MarkdownBlock {
 }
 
 const { width } = Dimensions.get('window');
+
+const AutoHeightImage: React.FC<{ uri: string }> = ({ uri }) => {
+  const [height, setHeight] = useState<number>(200);
+
+  useEffect(() => {
+    Image.getSize(uri, (w, h) => {
+      const imageWidth = width - 48; // account for padding
+      setHeight((h / w) * imageWidth);
+    }, () => {
+      setHeight(200);
+    });
+  }, [uri]);
+
+  return (
+    <Image
+      source={{ uri }}
+      style={[styles.image, { height }]}
+      resizeMode="contain"
+    />
+  );
+};
 
 export const MarkdownDisplay: React.FC<MarkdownDisplayProps> = ({ content }) => {
 
@@ -195,11 +216,7 @@ export const MarkdownDisplay: React.FC<MarkdownDisplayProps> = ({ content }) => 
           case 'image':
             return (
               <View key={index} style={styles.imageContainer}>
-                <Image 
-                  source={{ uri: block.content as string }} 
-                  style={styles.image} 
-                  resizeMode="contain"
-                />
+                <AutoHeightImage uri={block.content as string} />
                 {block.metadata?.alt && (
                     <Text style={styles.imageCaption}>{block.metadata.alt}</Text>
                 )}
@@ -367,18 +384,12 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
   },
   imageContainer: {
-    marginVertical: 24,
-    paddingVertical: 12,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
+    marginTop: 8,
+    marginBottom: 12,
     alignItems: 'center',
   },
   image: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    backgroundColor: colors.surface,
-    resizeMode: 'contain',
+    width: width - 48,
   },
   imageCaption: {
     marginTop: 8,
