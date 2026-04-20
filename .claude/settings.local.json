@@ -16,7 +16,9 @@
       "Bash(git stash push:*)",
       "Bash(git reset:*)",
       "Bash(eas whoami:*)",
-      "Bash(npx eas-cli whoami:*)"
+      "Bash(npx eas-cli whoami:*)",
+      "Bash(npx expo:*)",
+      "Bash(find /Users/kuba/Desktop/profiteezy-mobile -path \"*/google-signin/ios*\" -name \"*.m\" -o -path \"*/google-signin/ios*\" -name \"*.swift\" 2>/dev/null | head -10)"
     ]
   },
   "disabledMcpjsonServers": [

@@ -262,7 +262,6 @@ export const LoginScreen = () => {
       // Check if device supports Google Play Services
       await GoogleSignin.hasPlayServices();
 
-      // Perform the Google Sign-In
       const response = await GoogleSignin.signIn();
 
       if (isSuccessResponse(response)) {
@@ -273,7 +272,6 @@ export const LoginScreen = () => {
           throw new Error('No ID token returned from Google Sign-In');
         }
 
-        // Sign in with Supabase using the ID token
         const { data, error } = await supabase.auth.signInWithIdToken({
           provider: 'google',
           token: idToken,
@@ -759,7 +757,7 @@ export const LoginScreen = () => {
     <Ionicons name="mail" size={20} color={colors.text.primary} style={styles.authIcon} />
     <Text style={styles.authButtonText}>Sign in with Email</Text>
   </TouchableOpacity>
-</View>ł
+</View>
 
 <View style={styles.modalFooter}>
                   <Text style={styles.footerText}>
