@@ -25,21 +25,35 @@ const { width } = Dimensions.get('window');
 
 const AutoHeightImage: React.FC<{ uri: string }> = ({ uri }) => {
   const [height, setHeight] = useState<number>(200);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     Image.getSize(uri, (w, h) => {
-      const imageWidth = width - 48; // account for padding
+      const imageWidth = width - 48;
       setHeight((h / w) * imageWidth);
-    }, () => {
+    }, (err) => {
+      console.warn('[AutoHeightImage] getSize failed for', uri, err);
       setHeight(200);
     });
   }, [uri]);
+
+  if (failed) {
+    return (
+      <View style={[styles.image, { height: 120, backgroundColor: colors.surface, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: colors.text.tertiary, fontSize: 13 }}>Image unavailable</Text>
+      </View>
+    );
+  }
 
   return (
     <Image
       source={{ uri }}
       style={[styles.image, { height }]}
       resizeMode="contain"
+      onError={(e) => {
+        console.warn('[AutoHeightImage] load failed for', uri, e.nativeEvent.error);
+        setFailed(true);
+      }}
     />
   );
 };
@@ -277,7 +291,7 @@ const getBoxConfig = (type: BlockType) => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingBottom: 24,
+    paddingBottom: 4,
   },
   h1: {
     fontSize: 28,

@@ -302,9 +302,21 @@ export const LessonScreen: React.FC<LessonScreenProps> = ({
 
         {/* Render inline task if this is a text+task stage */}
         {stageType === 'text_with_task' && (
-          <View style={currentStage.content ? styles.taskContainer : styles.taskContainerNoContent}>
-            {renderTask()}
-          </View>
+          <>
+            {currentStage.content ? (
+              <View style={styles.taskDivider}>
+                <View style={styles.taskDividerLine} />
+                <View style={styles.taskDividerBadge}>
+                  <Ionicons name="pencil" size={12} color={colors.accent} />
+                  <Text style={styles.taskDividerLabel}>Your turn</Text>
+                </View>
+                <View style={styles.taskDividerLine} />
+              </View>
+            ) : null}
+            <View style={currentStage.content ? styles.taskContainer : styles.taskContainerNoContent}>
+              {renderTask()}
+            </View>
+          </>
         )}
       </ScrollView>
     );
@@ -460,11 +472,39 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     letterSpacing: -0.5,
   },
+  taskDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 0,
+    marginBottom: 12,
+  },
+  taskDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.surfaceBorder,
+  },
+  taskDividerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    marginHorizontal: 12,
+  },
+  taskDividerLabel: {
+    fontSize: 12,
+    color: colors.accent,
+    fontFamily: 'Inter_500Medium',
+    letterSpacing: 0.3,
+  },
   taskContainer: {
-    marginTop: 12,
+    marginTop: 0,
   },
   taskContainerNoContent: {
-    // No top margin/border when there's no content above the task
+    // No top margin when there's no content above the task
   },
   footer: {
     paddingHorizontal: 24,
