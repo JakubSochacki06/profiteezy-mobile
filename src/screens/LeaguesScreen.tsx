@@ -54,6 +54,8 @@ export const LeaguesScreen = () => {
       const load = async () => {
         setLoading(true);
         const data = await fetchLeaderboard();
+        console.log('[LeaguesScreen] fetchLeaderboard returned', data.length, 'entries, cancelled:', cancelled);
+        if (data.length > 0) console.log('[LeaguesScreen] first entry:', JSON.stringify(data[0]));
         if (!cancelled) {
           setLeaderboard(data);
           setLoading(false);
@@ -92,6 +94,7 @@ export const LeaguesScreen = () => {
   );
 
   const renderItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => {
+    console.log('[renderItem]', item.name, 'avatarUrl:', item.avatarUrl);
     let RankComponent;
 
     if (item.rank === 1) {
@@ -113,9 +116,13 @@ export const LeaguesScreen = () => {
             {RankComponent}
           </View>
 
-          <View style={[styles.avatar, { backgroundColor: item.avatarColor }]}>
-            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-          </View>
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: item.avatarColor }]}>
+              <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
 
           <Text style={[styles.userName, item.isCurrentUser && styles.userNameHighlight]}>
             {item.name}{item.isCurrentUser ? ' (You)' : ''}
@@ -264,6 +271,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   avatarText: {
     fontSize: 20,

@@ -8,6 +8,7 @@ import {
   Dimensions,
   StatusBar,
   Animated,
+  Easing,
   Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -276,6 +277,12 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Sticky chapter header
+  const [stickyStageIndex, setStickyStageIndex] = useState(0);
+  const stickyStageIndexRef = useRef(0);
+  const stageYPositions = useRef<number[]>([]);
+  const stickyOpacity = useRef(new Animated.Value(1)).current;
+
   useEffect(() => {
     fetchCourseData();
   }, [course.id]);
@@ -393,6 +400,38 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
     setExitingLessonId(null);
   };
 
+  const animateToStage = (newIndex: number) => {
+    if (newIndex === stickyStageIndexRef.current) return;
+    Animated.timing(stickyOpacity, {
+      toValue: 0,
+      duration: 120,
+      easing: Easing.in(Easing.ease),
+      useNativeDriver: true,
+    }).start(() => {
+      setStickyStageIndex(newIndex);
+      stickyStageIndexRef.current = newIndex;
+      Animated.timing(stickyOpacity, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const handleScroll = (e: any) => {
+    const y = e.nativeEvent.contentOffset.y;
+    let newIndex = 0;
+    for (let i = stageYPositions.current.length - 1; i >= 0; i--) {
+      const pos = stageYPositions.current[i];
+      if (pos !== undefined && y + 10 >= pos) {
+        newIndex = i;
+        break;
+      }
+    }
+    animateToStage(newIndex);
+  };
+
   // Calculate completion rate
   const totalLessons = stages.reduce((acc, stage) => acc + stage.lessons.length, 0);
   const completedLessons = stages.reduce(
@@ -401,11 +440,11 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
   );
   const completionRate = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
-  const renderPath = (lessons: Lesson[]) => {
+  const renderPath = (lessons: Lesson[], offset: number = 0) => {
     return (
       <View style={styles.pathContainer}>
         {lessons.map((lesson, index) => {
-          const isLeft = index % 2 === 0;
+          const isLeft = (offset + index) % 2 === 0;
           const isLast = index === lessons.length - 1;
           
           return (
@@ -580,69 +619,80 @@ export const CoursePathScreen: React.FC<CoursePathScreenProps> = ({
             <Text style={styles.emptySubtitle}>This course doesn't have any lessons yet</Text>
           </View>
         ) : (
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            onTouchStart={handleBackgroundPress}
-          >
-            {/* Subtle $ pattern — scrolls with content */}
-            {(() => {
-              const cols = 5;
-              const spacing = width / cols;
-              const totalLessons = stages.reduce((acc, s) => acc + s.lessons.length, 0);
-              const estimatedHeight = stages.length * 200 + totalLessons * (NODE_SIZE + 40) + 200;
-              const rows = Math.ceil(estimatedHeight / spacing);
-              const count = rows * cols;
-              return (
-                <View style={styles.patternContainer} pointerEvents="none">
-                  {Array.from({ length: count }).map((_, i) => {
-                    const row = Math.floor(i / cols);
-                    const col = i % cols;
-                    return (
-                      <Text
-                        key={i}
-                        style={[
-                          styles.patternChar,
-                          {
-                            left: col * spacing + spacing / 2 - 16,
-                            top: row * spacing,
-                          },
-                        ]}
-                      >
-                        $
+          <>
+            {/* Subtle $ pattern — fixed behind scroll */}
+            <View style={styles.patternContainer} pointerEvents="none">
+              {(() => {
+                const cols = 5;
+                const spacing = width / cols;
+                const rows = Math.ceil(Dimensions.get('window').height / spacing) + 2;
+                return Array.from({ length: rows * cols }).map((_, i) => {
+                  const row = Math.floor(i / cols);
+                  const col = i % cols;
+                  return (
+                    <Text
+                      key={i}
+                      style={[styles.patternChar, { left: col * spacing + spacing / 2 - 16, top: row * spacing }]}
+                    >
+                      $
+                    </Text>
+                  );
+                });
+              })()}
+            </View>
+
+            {/* Sticky chapter info — the one and only chapter card */}
+            {stages[stickyStageIndex] && (
+              <Animated.View style={{ opacity: stickyOpacity }}>
+                  <View style={[styles.chapterHeader, { marginTop: 8, marginBottom: 0 }]}>
+                    <View style={styles.chapterBadge}>
+                      <Text style={styles.chapterBadgeText}>
+                        STAGE {stickyStageIndex + 1} • {stages[stickyStageIndex].lessons.length} LESSONS
                       </Text>
-                    );
-                  })}
-                </View>
-              );
-            })()}
-
-            {stages.map((stage, stageIndex) => (
-              <View key={stage.id} style={styles.chapterContainer}>
-                {/* Stage Header */}
-                <View style={styles.chapterHeader}>
-                  <View style={styles.chapterBadge}>
-                    <Text style={styles.chapterBadgeText}>
-                      STAGE {stageIndex + 1} • {stage.lessons.length} LESSONS
-                    </Text>
+                    </View>
+                    <Text style={styles.chapterTitle}>{stages[stickyStageIndex].title}</Text>
+                    {stages[stickyStageIndex].description && (
+                      <Text style={styles.chapterDescription} numberOfLines={2}>
+                        {stages[stickyStageIndex].description}
+                      </Text>
+                    )}
                   </View>
-                  <Text style={styles.chapterTitle}>{stage.title}</Text>
-                  {stage.description && (
-                    <Text style={styles.chapterDescription} numberOfLines={2}>
-                      {stage.description}
-                    </Text>
-                  )}
-                </View>
+                </Animated.View>
+            )}
 
-                {/* Lessons Path */}
-                {stage.lessons.length > 0 ? (
-                  renderPath(stage.lessons)
-                ) : (
-                  <Text style={styles.noLessonsText}>No lessons in this stage yet</Text>
-                )}
-              </View>
-            ))}
-          </ScrollView>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+              onTouchStart={handleBackgroundPress}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+            >
+              {stages.map((stage, stageIndex) => {
+                const lessonOffset = stages.slice(0, stageIndex).reduce((acc, s) => acc + s.lessons.length, 0);
+                return (
+                  <View
+                    key={stage.id}
+                    onLayout={(e) => {
+                      if (stageIndex > 0) stageYPositions.current[stageIndex] = e.nativeEvent.layout.y;
+                    }}
+                  >
+                    {stageIndex > 0 && (
+                      <View style={styles.stageDivider}>
+                        <View style={styles.stageDividerLine} />
+                        <Text style={styles.stageDividerLabel}>{stage.title}</Text>
+                        <View style={styles.stageDividerLine} />
+                      </View>
+                    )}
+                    {stage.lessons.length > 0 ? (
+                      renderPath(stage.lessons, lessonOffset)
+                    ) : (
+                      <Text style={styles.noLessonsText}>No lessons in this stage yet</Text>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </>
         )}
       </View>
     </View>
@@ -703,9 +753,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingVertical: 16,
-  },
-  chapterContainer: {
-    marginBottom: 24,
   },
   chapterHeader: {
     backgroundColor: colors.surface,
@@ -967,6 +1014,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     textAlign: 'center',
     paddingHorizontal: PADDING,
+  },
+  stageDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 20,
+    gap: 12,
+  },
+  stageDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  stageDividerLabel: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    letterSpacing: 0.5,
   },
   startIndicatorContainer: {
     position: 'absolute',

@@ -368,6 +368,7 @@ export interface LeaderboardEntry {
   score: number;
   rank: number;
   avatarColor: string;
+  avatarUrl: string | null;
   isCurrentUser: boolean;
 }
 
@@ -395,7 +396,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, email, points')
+      .select('id, full_name, email, points, avatar_url')
       .order('points', { ascending: false })
       .limit(50);
 
@@ -410,6 +411,7 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
       score: profile.points ?? 0,
       rank: index + 1,
       avatarColor: avatarColorFromId(profile.id),
+      avatarUrl: profile.avatar_url ?? null,
       isCurrentUser: user?.id === profile.id,
     }));
   } catch (err) {
@@ -479,10 +481,20 @@ export async function markLessonComplete(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       return { success: false, error: 'User not authenticated' };
     }
+
+    // Check if already completed to avoid double-counting points
+    const { data: existing } = await supabase
+      .from('user_lesson_progress')
+      .select('is_completed')
+      .eq('user_id', user.id)
+      .eq('lesson_id', lessonId)
+      .maybeSingle();
+
+    const alreadyCompleted = existing?.is_completed === true;
 
     const { error } = await supabase
       .from('user_lesson_progress')
@@ -501,6 +513,23 @@ export async function markLessonComplete(
     if (error) {
       console.error('Error marking lesson complete:', error);
       return { success: false, error: error.message };
+    }
+
+    // Add points to profile only on first completion
+    if (!alreadyCompleted && pointsEarned > 0) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('points')
+        .eq('id', user.id)
+        .single();
+
+      await supabase
+        .from('profiles')
+        .update({
+          points: (profile?.points || 0) + pointsEarned,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
     }
 
     return { success: true };

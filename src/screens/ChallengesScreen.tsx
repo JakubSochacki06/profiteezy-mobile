@@ -120,9 +120,13 @@ export const ChallengesScreen = () => {
             {RankComponent}
           </View>
 
-          <View style={[styles.avatar, { backgroundColor: item.avatarColor }]}>
-            <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-          </View>
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: item.avatarColor }]}>
+              <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+            </View>
+          )}
 
           <Text style={[styles.userName, item.isCurrentUser && styles.userNameHighlight]}>
             {item.name}{item.isCurrentUser ? ' (You)' : ''}
@@ -271,6 +275,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   avatarText: {
     fontSize: 20,
